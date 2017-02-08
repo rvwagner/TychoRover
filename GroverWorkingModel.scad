@@ -1,5 +1,4 @@
 /*
-
 Parts manifest:
 - Breadboard jumper cables (square ends).  You will need both male->male and
   male->female (and ideally a couple female->female ones to cut up to make splitters)
@@ -564,10 +563,10 @@ module speedControlMount(peg_offset_1, peg_offset_2, hole_radius){
 }
 
 
-module wireManagementClip(){
+module wireManagementClip(batteryWidth = 0, batteryAnchorHeight = 0){
     thickness = 2;
     scm_mount_depth = 6;
-    length =  frame_backbone_outerwidth + thickness*2;
+    length =  max(batteryWidth, frame_backbone_outerwidth) + thickness*2;
     scm_clip_margin = 0.2;
     
     cube([thickness, length, thickness], center=true);
@@ -583,6 +582,13 @@ module wireManagementClip(){
     translate([scm_mount_depth/2,-frame_backbone_innerwidth/2+thickness/2+scm_clip_margin,0])
         cube([scm_mount_depth+thickness, thickness, thickness], center=true);
     
+    // Optional battery-restraint posts
+    if (batteryWidth > 0) {
+        translate([-batteryAnchorHeight/2, batteryWidth/2+thickness/2,0])
+            cube([batteryAnchorHeight+thickness, thickness, thickness], center=true);
+        translate([-batteryAnchorHeight/2,-batteryWidth/2-thickness/2,0])
+            cube([batteryAnchorHeight+thickness, thickness, thickness], center=true);
+    }
 }
 wireManagementClip();
 
@@ -594,6 +600,10 @@ speedControlMount(scm_peg_offset, scm_peg_offset, sc_board_hole_radius); // Prin
 speedControlMount(arduino_hole_offset_a, arduino_hole_offset_a, arduino_hole_radius); // Print 1
 speedControlMount(arduino_hole_offset_b1, arduino_hole_offset_b2, arduino_hole_radius); // Print 1
 wireManagementClip(); // Print at least 4
+
+wireManagementClip(14, 30); // Phone battery pack (print 2)
+wireManagementClip(27, 20); // LiFe Battery (print 2)
+
 
 !rotate([180,0,0])motorGrip(length = 16.5+tire_width); // Print 4
 frontBeam(); // Print 2
