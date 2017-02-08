@@ -21,6 +21,15 @@ There is a launch file that starts up all the required ROS nodes:
     roslaunch tycho tycho.launch
 
 
+## Controls
+
+On an XBox 360 controller, the controls are as follows:
+- Left stick: Drive and steer
+- A button: Enable driving in reverse (otherwise pulling stik back brakes)
+- B button: Change steering mode to strafing
+- X button: Emergency stop (disabled by allowing stick to return to neutral)
+
+
 ## Useful command-line snippets
 
 Rebuilding ROS Arduino libraries:
