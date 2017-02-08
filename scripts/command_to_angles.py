@@ -59,6 +59,8 @@ class CommandToAngles:
         """
         
         """
+        print("callback speed=%f"%data.speed)
+        
         if data.is_braking:
             self.setVehicleSpeed(0)
             self.createCommandMessage()
@@ -67,6 +69,7 @@ class CommandToAngles:
         
         if data.is_strafing and (data.speed != self.speed or data.strafing_angle != self.strafingAngle):
             self.strafingAngle = data.strafing_angle
+            self.speed = data.speed
             self.setAnglesStrafing(data.strafing_angle)
             self.setVehicleSpeed(data.speed)
             self.createCommandMessage()
@@ -76,6 +79,7 @@ class CommandToAngles:
             print("Not strafing, %.2f %.2f"%(data.turn_center_x,data.turn_center_y) )
             self.turnX = data.turn_center_x
             self.turnY = data.turn_center_y
+            self.speed = data.speed
             self.setAnglesFromTurnCenter(data.turn_center_x, data.turn_center_y)
             self.setVehicleSpeed(data.speed)
             self.createCommandMessage()
