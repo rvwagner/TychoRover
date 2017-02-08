@@ -4,7 +4,7 @@ Parts manifest:
 - Breadboard jumper cables (square ends).  You will need both male->male and
   male->female (and ideally a couple female->female ones to cut up to make splitters)
 - DROK four-channel speed controller - https://www.amazon.com/gp/product/B017FZF42G
-- Arduino Due
+- Arduino Uno
 - 4x TowerPro SG90 micro servos (or equivalent cheap knock-offs) - https://www.amazon.com/gp/product/B015H5AVZG
 - 4x extra screws of the same size as the mounting screws that come with the servos
 - 4x 12V micro gearmotors (I used 175rpm ones) - https://www.sparkfun.com/products/12205
