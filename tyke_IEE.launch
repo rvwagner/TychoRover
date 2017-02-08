@@ -1,0 +1,11 @@
+<launch>
+	<rosparam command="load" file="$(find tycho)/tycho_params.yml" />
+	<node name="joy_node" pkg="joy" type="joy_node" respawn="true" />
+	
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command_IEE547.py" output="screen" >
+	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
+	</node>
+	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
+	
+	<node name="serial_bridge" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" />
+</launch>
