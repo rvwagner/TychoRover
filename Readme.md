@@ -13,6 +13,16 @@ Requires that [ROS][] be installed (tested on ROS Kinetic Kame on Ubuntu 16.04),
 
 Requires that the [Arduino][] IDE be installed: `sudo apt-get install arduino`
 
+### For the CAN stuff [in progress]
+
+- [CANard][]
+
+    git clone https://github.com/normaldotcom/CANard.git
+    cd CANard
+    [sudo] python setup.py install
+
+- (if using SocketCAN) [can-utils][]: `sudo apt install can-utils`
+- (if using SocketCAN) slcan kernel module, if not already built [instructions](https://wiki.linklayer.com/index.php/CANtact_on_Raspberry_Pi).
 
 ## Running the code
 
@@ -45,3 +55,5 @@ Rebuilding ROS Arduino libraries:
 [ROSSerial_Arduino]: http://wiki.ros.org/rosserial_arduino
 [Arduino]: http://arduino.cc
 [OpenSCAD]: http://www.openscad.org
+[can-utils]: https://github.com/linux-can/can-utils
+[CANard]: https://github.com/normaldotcom/CANard
