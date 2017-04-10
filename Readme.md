@@ -17,9 +17,11 @@ Requires that the [Arduino][] IDE be installed: `sudo apt-get install arduino`
 
 - [CANard][]
 
-    git clone https://github.com/normaldotcom/CANard.git
-    cd CANard
-    [sudo] python setup.py install
+    `git clone https://github.com/normaldotcom/CANard.git`
+    
+    `cd CANard`
+    
+    `[sudo] python setup.py install`
 
 - (if using SocketCAN) [can-utils][]: `sudo apt install can-utils`
 - (if using SocketCAN) slcan kernel module, if not already built [instructions](https://wiki.linklayer.com/index.php/CANtact_on_Raspberry_Pi).
