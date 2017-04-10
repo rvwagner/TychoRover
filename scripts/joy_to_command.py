@@ -72,7 +72,7 @@ class JoyToCommand:
         
         # Prevent killswitch disable unless joystick is neutral
         if self.joyState['stopButton'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
-            hasChanged = updateValueIfNeeded(data.buttons[2], 'stopButton') or hasChanged
+            hasChanged = updateValueIfNeeded('stopButton') or hasChanged
         
         if hasChanged:
             self.interpretJoystick()
