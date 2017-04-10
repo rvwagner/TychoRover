@@ -9,7 +9,6 @@ from math import atan2, sqrt, pi, sin, cos
 # This ROS Node converts Joystick inputs from the joy node
 # into commands for turtlesim
 
-
 class JoyToCommand:
     def __init__(self):
         rospy.Subscriber("joy", Joy, self.callback)
@@ -20,6 +19,16 @@ class JoyToCommand:
         self.strafeDeadZone = 1.0/2.0;
         
         self.steeringMode = "off"
+
+        self.buttonMap = {}
+        self.buttonMap['joyXAxis'] = 0
+        self.buttonMap['joyYAxis'] = 1
+        self.buttonMap['modeNormal'] = 3
+        self.buttonMap['modeSideways'] = 0
+        self.buttonMap['modeFrontLeft'] = 2
+        self.buttonMap['modeFrontRight'] = 1
+        self.buttonMap['reverseModeButton'] = -1
+        self.buttonMap['stopButton'] = 8
         
         
         self.joyState = {}
@@ -41,30 +50,31 @@ class JoyToCommand:
     # axis 1 aka left stick vertical controls linear speed
     # axis 0 aka left stick horizonal controls angular speed
     def callback(self, data):
-        """
-        
-        """
-        def updateValueIfNeeded(newdata, key):
+        def updateValueIfNeeded(key, isAxis=False):
+            if isAxis:
+                newdata = data.axes[ self.buttonMap[key] ]
+            else:
+                newdata = data.buttons[ self.buttonMap[key] ]
             if self.joyState[key] != newdata:
                 self.joyState[key] = newdata
                 return True
             return False
         #
-        
+
         # TODO: Why is it never registering the return to 0,0 properly?
         # TODO: Why is stopButton disabling the turning mechanism as well? isBraking.
         # TODO: Why does stopButton stop working if I don't specify isBraking?
         hasChanged = False
-        hasChanged = updateValueIfNeeded(data.axes[0], 'joyXAxis') or hasChanged
-        hasChanged = updateValueIfNeeded(data.axes[1], 'joyYAxis') or hasChanged
-        hasChanged = updateValueIfNeeded(data.buttons[3], 'modeNormal') or hasChanged
-        hasChanged = updateValueIfNeeded(data.buttons[0], 'modeSideways') or hasChanged
-        hasChanged = updateValueIfNeeded(data.buttons[2], 'modeFrontLeft') or hasChanged
-        hasChanged = updateValueIfNeeded(data.buttons[1], 'modeFrontRight') or hasChanged
+        hasChanged = updateValueIfNeeded('joyXAxis', isAxis=True) or hasChanged
+        hasChanged = updateValueIfNeeded('joyYAxis', isAxis=True) or hasChanged
+        hasChanged = updateValueIfNeeded('modeNormal') or hasChanged
+        hasChanged = updateValueIfNeeded('modeSideways') or hasChanged
+        hasChanged = updateValueIfNeeded('modeFrontLeft') or hasChanged
+        hasChanged = updateValueIfNeeded('modeFrontRight') or hasChanged
         
         # Prevent killswitch disable unless joystick is neutral
         if self.joyState['stopButton'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
-            hasChanged = updateValueIfNeeded(data.buttons[8], 'stopButton') or hasChanged
+            hasChanged = updateValueIfNeeded('stopButton') or hasChanged
         
         if hasChanged:
             self.interpretJoystick()

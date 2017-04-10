@@ -21,12 +21,21 @@ class JoyToCommand:
         
         self.steeringMode = "off"
         
+
+        self.buttonMap = {}
+        self.buttonMap['joyXAxis'] = 0
+        self.buttonMap['joyYAxis'] = 1
+        self.buttonMap['modeSideways'] = 1
+        self.buttonMap['modeCircleStrafe'] = -1
+        self.buttonMap['modeReverse'] = 0
+        self.buttonMap['stopButton'] = 2
         
         self.joyState = {}
         self.joyState['joyXAxis'] = 0.0
         self.joyState['joyYAxis'] = 0.0
-        self.joyState['steeringModeButton'] = 0
-        self.joyState['reverseModeButton'] = 0
+        self.joyState['modeSideways'] = 0
+        self.joyState['modeCircleStrafe'] = 0
+        self.joyState['modeReverse'] = 0
         self.joyState['stopButton'] = 0
         self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand)
     #
@@ -41,7 +50,11 @@ class JoyToCommand:
         """
         
         """
-        def updateValueIfNeeded(newdata, key):
+        def updateValueIfNeeded(key, isAxis=False):
+            if isAxis:
+                newdata = data.axes[ self.buttonMap[key] ]
+            else:
+                newdata = data.buttons[ self.buttonMap[key] ]
             if self.joyState[key] != newdata:
                 self.joyState[key] = newdata
                 return True
@@ -52,10 +65,10 @@ class JoyToCommand:
         # TODO: Why is stopButton disabling the turning mechanism as well? isBraking.
         # TODO: Why does stopButton stop working if I don't specify isBraking?
         hasChanged = False
-        hasChanged = updateValueIfNeeded(data.axes[0], 'joyXAxis') or hasChanged
-        hasChanged = updateValueIfNeeded(data.axes[1], 'joyYAxis') or hasChanged
-        hasChanged = updateValueIfNeeded(data.buttons[1], 'steeringModeButton') or hasChanged
-        hasChanged = updateValueIfNeeded(data.buttons[0], 'reverseModeButton') or hasChanged
+        hasChanged = updateValueIfNeeded('joyXAxis', isAxis=True) or hasChanged
+        hasChanged = updateValueIfNeeded('joyYAxis', isAxis=True) or hasChanged
+        hasChanged = updateValueIfNeeded('modeSideways') or hasChanged
+        hasChanged = updateValueIfNeeded('modeReverse') or hasChanged
         
         # Prevent killswitch disable unless joystick is neutral
         if self.joyState['stopButton'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
@@ -67,7 +80,7 @@ class JoyToCommand:
     
     def interpretJoystick(self):
         
-        if self.joyState['steeringModeButton'] == 1:
+        if self.joyState['modeSideways'] == 1:
             self.interpretStrafe()
         else:
             self.interpretNormal()
@@ -76,7 +89,7 @@ class JoyToCommand:
         
         if self.steeringMode != "off" and self.joyState['joyXAxis'] == 0.0 and self.joyState['joyYAxis'] == 0.0:
             self.steeringMode = "off"
-            self.joyState['reverseModeButton'] = 1
+            self.joyState['modeReverse'] = 1
             self.interpretNormal()
         elif self.steeringMode == "off" and self.joyState['joyYAxis'] < -0.5:
             self.steeringMode = "strafe"
@@ -87,7 +100,7 @@ class JoyToCommand:
         #
         
         print(self.steeringMode)
-        if self.joyState['steeringModeButton'] == 1 or self.steeringMode == "strafe":
+        if self.joyState['modeSideways'] == 1 or self.steeringMode == "strafe":
             self.interpretStrafe()
         elif self.steeringMode == "normal":
             self.interpretNormal()
@@ -110,7 +123,7 @@ class JoyToCommand:
             isStrafing = True
         #
         
-        if speed < 0 and (self.joyState['reverseModeButton'] == 0):
+        if speed < 0 and (self.joyState['modeReverse'] == 0):
             speed = 0
             isBraking = True
         else:
@@ -149,7 +162,7 @@ class JoyToCommand:
         if abs(self.joyState['joyXAxis']) < 0.05 or abs(strafeAngle > 90):
             strafeAngle = 0.0
         #
-        isBraking = (self.joyState['reverseModeButton'] == 1)
+        isBraking = (self.joyState['modeReverse'] == 1)
         self.publishCommandMessage(speed, turnX=0, turnY=0, strafeAngle=strafeAngle, isStrafing=True, isBraking=isBraking);
     #
     
