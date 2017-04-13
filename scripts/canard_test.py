@@ -14,43 +14,31 @@ import struct # For converting incoming packet data to ints
 #########
 # SETUP #
 #########
-# This code just magically started working for no apparent reason.  Is some Ubuntu process sniffing at any freshly-loaded serial ports for several minutes?
 
-# PySerial test.
-# Doesn't seem to do any better than the CANtact version, but
-# it's less opaque.
-if False: # Serial test
-  print "Finding serial port"
-  port = glob("/dev/ttyACM?")[-1]
-  print "Found serial port '%s'"%port
-  import serial
-  ser = serial.Serial(port, 9600, timeout=0)
-  print "reading..."
-  ser.read(10)
-  print "starting up"
-  ser.write(b'S5\r') #.encode())
-  ser.write(b'O\r') #.encode())
-  print "reading..."
-  ser.read(10)
-  ser.write(b'C\r') #.encode())
-  print "done"
-  exit()
-#
+# Give serial port a swift kick in the pants
+# Without opening, writing to, and closing the port, it apparently forgets
+# how to write once the CANable stuff starts (full output buffer?).
+import serial
+port = glob("/dev/ttyACM?")[-1]
+print "Executing serial SKITP protocol on %s"%port
+ser = serial.Serial(port, 9600, timeout=1)
+ser.write(b'\r')
+ser.close()
 
 # TODO: Organize this in an appropriate place
 PacketTypes = Enum('PacketTypes', 'TPDO heartbeat other')
 
-#######################
-# CAN Packet Handlers #
-#######################
+############################
+# CAN Packet Handler Class #
+############################
 
 class TychoCANable:
-  def __init__(self):
+  def __init__(self, port="auto"):
     self.specialCommands = {
     "estop" : {"header": 0x600, "dlc": 8,
                "data": [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]}
     }
-    self.startCANable()
+    self.startCANable(port=port)
   #
   
   
@@ -159,7 +147,7 @@ class TychoCANable:
 # Main Loop #
 #############
 
-canable = TychoCANable()
+canable = TychoCANable(port=port)
 
 print "Sending initial frame"
 frame = canable.buildRawCommand(1, 0x200, 8, [0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
