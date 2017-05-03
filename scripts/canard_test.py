@@ -5,6 +5,7 @@ from canard.hw import cantact
 
 import rospy
 from tycho.msg import WheelAnglesSpeeds
+from tycho.msg import WheelStatus
 
 from glob import glob # For auto-detecting serial port (to be improved)
 from enum import Enum
@@ -89,8 +90,8 @@ class TychoCANable:
   
   def buildRPDO(self, dest, index, int1, int2):
     # TODO: Check for overflow when fixing inputs
-    if isinstance(int1, int): int1 = int(round(int1))
-    if isinstance(int2, int): int2 = int(round(int2))
+    if not isinstance(int1, int): int1 = int(round(int1))
+    if not isinstance(int2, int): int2 = int(round(int2))
     
     # Frame ID is 0x200/300/400/500 + node ID
     header = (0x100 + 0x100*index)|dest
@@ -143,11 +144,80 @@ class TychoCANable:
 # END CLASS
 
 
+
+
+
+
+
+frontLeftID  = 1
+frontRightID = 2
+backLeftID   = 3
+backRightID  = 4
+speedMultiplier = 1.0
+angleMultiplier = 1.0
+
+def new_command_callback(data):
+    canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
+    canable.sendFrame(canable.buildRPDO(frontRightID, 1, round(data.front_right_speed * speedMultiplier), round( data.front_right_angle * angleMultiplier)))
+    canable.sendFrame(canable.buildRPDO(backLeftID, 1, round(data.back_left_speed * speedMultiplier), round(data.back_left_angle * angleMultiplier)))
+    canable.sendFrame(canable.buildRPDO(backRightID, 1, round(data.back_right_speed * speedMultiplier), round(data.back_right_angle * angleMultiplier)))
+#
+
+# starts the node
+def start():
+    # Subscribe to low-level commands topic
+    rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback)
+    
+    # Publish topic with current wheel sensor statuses
+    # TODO: Maybe break this up into a couple of topics?
+    statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus)
+    
+    # starts the node
+    rospy.init_node('CAN_Handler')
+    # rospy.spin()
+#
+
+
+ready_to_send = [0x0,0x0,0x0,0x0,0x0]
+wheel_statuses = [0, WheelStatus(), WheelStatus(), WheelStatus(), WheelStatus()]
+for i in (1,2,3,4): wheel_statuses[node].node_id = i
+
+def handleTPDO(index, node, data1, data2):
+	if index == 1: # TPDO1: RMP 1, Amps 1
+		wheel_statuses[node].drive_rpm = data1
+		wheel_statuses[node].drive_amps = data2
+		ready_to_send[node] |= 0x1
+	elif index == 1: # TPDO2: Count 1, MCU Temp
+		wheel_statuses[node].drive_spin_count = data1
+		wheel_statuses[node].controller_temp = data2
+		ready_to_send[node] |= 0x2
+	elif index == 1: # TPDO3: Angle 2, Amps 2
+		wheel_statuses[node].steering_angle = data1
+		wheel_statuses[node].steering_amps = data2
+		ready_to_send[node] |= 0x4
+	elif index == 1: # TPDO4: Temp 1, Temp 2
+		wheel_statuses[node].drive_temp = data1
+		wheel_statuses[node].steering_temp = data2
+		ready_to_send[node] |= 0x8
+	else:
+		return # TODO: Throw an error
+	#
+	
+	if ready_to_send[node] == 0xF:
+		statuspub.publish(wheel_statuses[node])
+		ready_to_send[node] = 0x0
+	#
+#
+
+
 #############
 # Main Loop #
 #############
 
 canable = TychoCANable(port=port)
+
+start()
+
 
 print "Sending initial frame"
 frame = canable.buildRawCommand(1, 0x200, 8, [0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
@@ -171,38 +241,6 @@ while True:
     pass
   else: # Unknwon packet type
     print "%03X"%f.id, f.data
-#
-
-
-
-
-frontLeftID  = 1
-frontRightID = 2
-backLeftID   = 3
-backRightID  = 4
-speedMultiplier = 1.0
-angleMultiplier = 1.0
-
-def new_command_callback(self, data):
-    canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
-    canable.sendFrame(canable.buildRPDO(frontRightID, 1, round(data.front_right_speed * speedMultiplier), round( data.front_right_angle * angleMultiplier)))
-    canable.sendFrame(canable.buildRPDO(backLeftID, 1, round(data.back_left_speed * speedMultiplier), round(data.back_left_angle * angleMultiplier)))
-    canable.sendFrame(canable.buildRPDO(backRightID, 1, round(data.back_right_speed * speedMultiplier), round(data.back_right_angle * angleMultiplier)))
-#
-
-
-# starts the node
-def start():
-    # Subscribe to low-level commands topic
-    rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback)
-    
-    # Publish topic with current wheel sensor statuses
-    # TODO: Maybe break this up into a couple of topics?
-    pub = rospy.Publisher('tycho/wheel_status', WheelAnglesSpeeds)
-    
-    # starts the node
-    rospy.init_node('CAN_Handler')
-    rospy.spin()
 #
 
 
