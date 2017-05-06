@@ -6,7 +6,7 @@
 	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
 	</node>
 	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
-	<!-- <node name="debug_display" pkg="tycho" type="debug_gui.py" output="screen" /> -->
+	<node name="debug_display" pkg="tycho" type="debug_gui.py" />
 
 
 	<node name="canard_node" pkg="tycho" type="canard_test.py" output="screen" />
