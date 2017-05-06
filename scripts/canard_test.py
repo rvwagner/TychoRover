@@ -95,7 +95,7 @@ class TychoCANable:
     
     # Frame ID is 0x200/300/400/500 + node ID
     header = (0x100 + 0x100*index)|dest
-    print("Building frame %03X : %d, %d"%(header, int1, int2))
+    #print("Building frame %03X : %d, %d"%(header, int1, int2))
     frame = can.Frame(header)
     frame.dlc = 8
     frame.data = [
@@ -153,8 +153,8 @@ frontLeftID  = 1
 frontRightID = 2
 backLeftID   = 3
 backRightID  = 4
-speedMultiplier = 1.0
-angleMultiplier = 1.0
+speedMultiplier = 100
+angleMultiplier = 10
 
 def new_command_callback(data):
     canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
@@ -164,38 +164,36 @@ def new_command_callback(data):
 #
 
 # starts the node
-def start():
-    # Subscribe to low-level commands topic
-    rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback)
+
+# Subscribe to low-level commands topic
+rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback)
     
-    # Publish topic with current wheel sensor statuses
-    # TODO: Maybe break this up into a couple of topics?
-    statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus)
-    
-    # starts the node
-    rospy.init_node('CAN_Handler')
-    # rospy.spin()
-#
+# Publish topic with current wheel sensor statuses
+# TODO: Maybe break this up into a couple of topics?
+statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus)
+
+# starts the node
+rospy.init_node('CAN_Handler')
 
 
 ready_to_send = [0x0,0x0,0x0,0x0,0x0]
 wheel_statuses = [0, WheelStatus(), WheelStatus(), WheelStatus(), WheelStatus()]
-for i in (1,2,3,4): wheel_statuses[node].node_id = i
+for i in (1,2,3,4): wheel_statuses[i].wheel_id = i
 
 def handleTPDO(index, node, data1, data2):
 	if index == 1: # TPDO1: RMP 1, Amps 1
 		wheel_statuses[node].drive_rpm = data1
 		wheel_statuses[node].drive_amps = data2
 		ready_to_send[node] |= 0x1
-	elif index == 1: # TPDO2: Count 1, MCU Temp
+	elif index == 2: # TPDO2: Count 1, MCU Temp
 		wheel_statuses[node].drive_spin_count = data1
 		wheel_statuses[node].controller_temp = data2
 		ready_to_send[node] |= 0x2
-	elif index == 1: # TPDO3: Angle 2, Amps 2
+	elif index == 3: # TPDO3: Angle 2, Amps 2
 		wheel_statuses[node].steering_angle = data1
 		wheel_statuses[node].steering_amps = data2
 		ready_to_send[node] |= 0x4
-	elif index == 1: # TPDO4: Temp 1, Temp 2
+	elif index == 4: # TPDO4: Temp 1, Temp 2
 		wheel_statuses[node].drive_temp = data1
 		wheel_statuses[node].steering_temp = data2
 		ready_to_send[node] |= 0x8
@@ -204,6 +202,7 @@ def handleTPDO(index, node, data1, data2):
 	#
 	
 	if ready_to_send[node] == 0xF:
+		print "Publishing % 5d % 5d % 5d % 5d % 5d % 5d % 5d % 5d"%(wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp)
 		statuspub.publish(wheel_statuses[node])
 		ready_to_send[node] = 0x0
 	#
@@ -216,11 +215,10 @@ def handleTPDO(index, node, data1, data2):
 
 canable = TychoCANable(port=port)
 
-start()
 
 
 print "Sending initial frame"
-frame = canable.buildRawCommand(1, 0x200, 8, [0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
+frame = canable.buildRawCommand(1, 0x200, 8, [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
 canable.sendFrame(frame)
 print(frame)
 
@@ -229,12 +227,13 @@ while True:
   f, packet_type = canable.receiveFrameWithType()
   if packet_type == PacketTypes.TPDO:
     index, node, data1, data2 = canable.readTPDO(f)
-    print "TPDO%d: %d, %d"%(index, data1, data2)
-    count += 1
-    if count % 10 == 0:
-      frame = canable.buildRPDO(1,1,data2+1, 0)
-      print(frame)
-      canable.sendFrame(frame)
+    handleTPDO(index, node, data1, data2)
+ #   print "TPDO%d: %d, %d"%(index, data1, data2)
+ #   count += 1
+ #   if count % 10 == 0:
+ #     frame = canable.buildRPDO(1,1,data2+1, 0)
+ #     print(frame)
+ #     canable.sendFrame(frame)
     #elif count > 100:
     #  dev.send(estop_frame)
   elif packet_type == PacketTypes.heartbeat:
