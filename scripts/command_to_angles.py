@@ -63,6 +63,8 @@ class CommandToAngles:
         
         if data.is_braking:
             self.speed = 0
+	    self.setVehicleSpeed(self.speed)
+	    self.createCommandMessage()
         else:
             self.speed = data.speed
             #self.setVehicleSpeed(0)

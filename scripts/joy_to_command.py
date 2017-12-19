@@ -73,24 +73,26 @@ class JoyToCommand:
         # Prevent killswitch disable unless joystick is neutral
         if self.joyState['stopButton'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
             hasChanged = updateValueIfNeeded('stopButton') or hasChanged
-        
+
         if hasChanged:
             self.interpretJoystick()
     #
     
     def interpretJoystick(self):
-        
+
         if self.joyState['modeSideways'] == 1:
             self.interpretStrafe()
         else:
+	    print ('send to interp normal')
+	    print (self.joyState['modeReverse'])
             self.interpretNormal()
         
         return
         
         if self.steeringMode != "off" and self.joyState['joyXAxis'] == 0.0 and self.joyState['joyYAxis'] == 0.0:
-            self.steeringMode = "off"
+	    self.steeringMode = "off"
             self.joyState['modeReverse'] = 1
-            self.interpretNormal()
+	    self.interpretNormal()
         elif self.steeringMode == "off" and self.joyState['joyYAxis'] < -0.5:
             self.steeringMode = "strafe"
         elif self.steeringMode == "off" and self.joyState['joyYAxis'] > 0.15:
@@ -112,23 +114,26 @@ class JoyToCommand:
     #
     
     def interpretNormal(self):
+
         speed = self.joyState['joyYAxis']
         strafeAngle=0
         turnX = 0
-        if self.joyState['joyXAxis'] != 0.0:
+
+        if (self.joyState['joyXAxis'] != 0.0):
             turnY = -1/self.joyState['joyXAxis']
             isStrafing = False
         else:
             turnY = 0
             isStrafing = True
-        #
-        
-        if speed < 0 and (self.joyState['modeReverse'] == 0):
-            speed = 0
-            isBraking = True
-        else:
-            isBraking = False
-        #
+	 #
+	
+	if (self.joyState['joyYAxis'] == 0):
+		isBraking = True
+	else: 
+		isBraking = False
+
+	if(self.joyState['joyYAxis'] < 0):
+		self.joyState['modeReverse'] = 1		
         
         # Rotate the steering axis so that strafeAngle is forward
         # Not actually useful, but fun.
@@ -153,21 +158,22 @@ class JoyToCommand:
         
         # TODO If reverse mode active
         #if self.joyState['joyYAxis'] < 0: speed = -speed
-        if self.joyState['joyYAxis'] < 0:
-            speed = 0
+        if self.joyState['joyYAxis'] <= 0.0:
+	    speed = 0
             isBraking = True
         else:
             isBraking = False
-        
+
         if abs(self.joyState['joyXAxis']) < 0.05 or abs(strafeAngle > 90):
             strafeAngle = 0.0
         #
+
         isBraking = (self.joyState['modeReverse'] == 1)
         self.publishCommandMessage(speed, turnX=0, turnY=0, strafeAngle=strafeAngle, isStrafing=True, isBraking=isBraking);
     #
     
     def interpretTurnInPlace(self):
-        speed = self.joyState['joyXAxis']
+	speed = self.joyState['joyXAxis']
         isBraking = (self.joyState['joyYAxis'] <= -0.75)
         self.publishCommandMessage(speed, turnX=0, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
     #
