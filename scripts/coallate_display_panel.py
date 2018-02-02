@@ -2,7 +2,6 @@
 import rospy
 from tycho.msg import WheelStatus, RoverPosition, DisplayPanel
 from math import atan, atan2, sqrt, pi
-import operator
 
 # Builds up packets to send to the display panel
 # Sends combined packets at a fixed rate, based on the most recent data
@@ -104,8 +103,8 @@ class CommandToAngles:
         m.back_right_angle  = self.back_right_angle
         m.total_amps        = sum(self.amp_list)
         m.battery_pct       = self.remaining_amp_hours/self.max_amp_hours
-        m.hottest_motor_id, m.max_drive_temp = max(enumerate(self.drive_temp_list), key=operator.itemgetter(1))
-        m.hottest_motor_id  += 1
+        m.max_drive_temp    = max(self.drive_temp_list)
+        m.hottest_motor_id  = self.drive_temp_list.index(m.max_drive_temp) + 1
         m.roll              = self.roll
         m.pitch             = self.pitch
         m.heading           = self.heading
