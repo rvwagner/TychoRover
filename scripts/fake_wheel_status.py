@@ -8,13 +8,13 @@ from tycho.msg import WheelAnglesSpeeds, WheelStatus
 
 class MakeFakeWheelStatus:
     def __init__(self):
-        rospy.Subscriber("tycho/low_level_motor_values", RoverDriveCommand, self.lowlevel_callback)
+        rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, self.lowlevel_callback)
         
         self.old_drive_temperatures = [40,40,40,40]
         self.old_steer_temperatures = [40,40,40,40]
         self.old_cntrl_temperatures = [40,40,40,40]
         
-        self.timestamp = rospy.Time.now()
+        self.timestamp = -1
         
         self.pub = rospy.Publisher('tycho/wheel_status', WheelStatus)
     #
@@ -30,9 +30,15 @@ class MakeFakeWheelStatus:
         """
         
         # Get time delta
-        dt = data.header.stamp - self.timestamp # TODO: Is this in seconds? It should be
-        self.timestamp = data.header.stamp
-        
+        # Get time delta
+        if self.timestamp == -1:
+            self.timestamp = data.header.stamp
+            return
+        else:
+            dt = (data.header.stamp - self.timestamp).secs # TODO: Is this in seconds? It should be
+            self.timestamp = data.header.stamp
+        #
+        print(dt)
         wheel1Status = WheelStatus()
         wheel1Status.wheel_id        = 1
         wheel1Status.drive_rpm       = data.front_left_speed * 175.0 # Assumes speed is scaled -1 to 1
@@ -40,9 +46,9 @@ class MakeFakeWheelStatus:
         wheel1Status.drive_amps      = data.front_left_speed * 150
         wheel1Status.steering_amps   = 1
         wheel1Status.drive_spin_count = wheel1Status.drive_rpm / 60.0 * dt
-        wheel1Status.drive_temp      = old_drive_temperatures[0] + (wheel1Status.drive_amps - 30)**2*dt/100
+        wheel1Status.drive_temp      = self.old_drive_temperatures[0] + (wheel1Status.drive_amps - 30)**2*dt/100
         wheel1Status.steering_temp   = 40
-        wheel1Status.controller_temp = old_cntrl_temperatures[0] + (wheel1Status.drive_amps - 30)**2*dt/500
+        wheel1Status.controller_temp = self.old_cntrl_temperatures[0] + (wheel1Status.drive_amps - 30)**2*dt/500
         
         
         wheel2Status = WheelStatus()
@@ -52,9 +58,9 @@ class MakeFakeWheelStatus:
         wheel2Status.drive_amps      = data.front_right_speed * 150
         wheel2Status.steering_amps   = 1
         wheel2Status.drive_spin_count = wheel2Status.drive_rpm / 60.0 * dt
-        wheel2Status.drive_temp      = old_drive_temperatures[1] + (wheel2Status.drive_amps - 30)**2*dt/100
+        wheel2Status.drive_temp      = self.old_drive_temperatures[1] + (wheel2Status.drive_amps - 30)**2*dt/100
         wheel2Status.steering_temp   = 40
-        wheel2Status.controller_temp = old_cntrl_temperatures[1] + (wheel2Status.drive_amps - 30)**2*dt/500
+        wheel2Status.controller_temp = self.old_cntrl_temperatures[1] + (wheel2Status.drive_amps - 30)**2*dt/500
         
         
         wheel3Status = WheelStatus()
@@ -64,9 +70,9 @@ class MakeFakeWheelStatus:
         wheel3Status.drive_amps      = data.back_left_speed * 150
         wheel3Status.steering_amps   = 1
         wheel3Status.drive_spin_count = wheel3Status.drive_rpm / 60.0 * dt
-        wheel3Status.drive_temp      = old_drive_temperatures[2] + (wheel3Status.drive_amps - 30)**2*dt/100
+        wheel3Status.drive_temp      = self.old_drive_temperatures[2] + (wheel3Status.drive_amps - 30)**2*dt/100
         wheel3Status.steering_temp   = 40
-        wheel3Status.controller_temp = old_cntrl_temperatures[2] + (wheel3Status.drive_amps - 30)**2*dt/500
+        wheel3Status.controller_temp = self.old_cntrl_temperatures[2] + (wheel3Status.drive_amps - 30)**2*dt/500
         
         
         wheel4Status = WheelStatus()
@@ -76,14 +82,14 @@ class MakeFakeWheelStatus:
         wheel4Status.drive_amps      = data.back_right_speed * 150
         wheel4Status.steering_amps   = 1
         wheel4Status.drive_spin_count = wheel4Status.drive_rpm / 60.0 * dt
-        wheel4Status.drive_temp      = old_drive_temperatures[3] + (wheel4Status.drive_amps - 30)**2*dt/100
+        wheel4Status.drive_temp      = self.old_drive_temperatures[3] + (wheel4Status.drive_amps - 30)**2*dt/100
         wheel4Status.steering_temp   = 40
-        wheel4Status.controller_temp = old_cntrl_temperatures[3] + (wheel4Status.drive_amps - 30)**2*dt/500
+        wheel4Status.controller_temp = self.old_cntrl_temperatures[3] + (wheel4Status.drive_amps - 30)**2*dt/500
         
         
-        old_drive_temperatures = [wheel1Status.drive_temp, wheel2Status.drive_temp, wheel3Status.drive_temp, wheel4Status.drive_temp]
-        old_steer_temperatures = [wheel1Status.steering_temp, wheel2Status.steering_temp, wheel3Status.steering_temp, wheel4Status.steering_temp]
-        old_cntrl_temperatures = [wheel1Status.controller_temp, wheel2Status.controller_temp, wheel3Status.controller_temp, wheel4Status.controller_temp]
+        self.old_drive_temperatures = [wheel1Status.drive_temp, wheel2Status.drive_temp, wheel3Status.drive_temp, wheel4Status.drive_temp]
+        self.old_steer_temperatures = [wheel1Status.steering_temp, wheel2Status.steering_temp, wheel3Status.steering_temp, wheel4Status.steering_temp]
+        self.old_cntrl_temperatures = [wheel1Status.controller_temp, wheel2Status.controller_temp, wheel3Status.controller_temp, wheel4Status.controller_temp]
         
         
         self.pub.publish(wheel1Status)

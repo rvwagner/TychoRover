@@ -28,7 +28,7 @@ class CommandToAngles:
         self.heading             = 0.0
         
         # Helper variables
-        self.last_pose_time      = rospy.Time.now()
+        self.last_pose_time      = -1
         self.last_wheel_times    = [self.last_pose_time,self.last_pose_time,self.last_pose_time,self.last_pose_time]
         self.max_amp_hours       = 100.0
         self.remaining_amp_hours = self.max_amp_hours # TODO: Handle battery percent better
@@ -46,8 +46,13 @@ class CommandToAngles:
         
         """
         
-        dt = data.header.stamp - self.last_wheel_timesdata.wheel_id-1] # TODO: Is this in seconds? It should be
-        self.last_wheel_timesdata.wheel_id-1] = data.header.stamp
+        if self.last_wheel_times[data.wheel_id-1] == -1:
+            self.last_wheel_times[data.wheel_id-1] = data.header.stamp
+            return
+        else:
+            dt = (data.header.stamp - self.last_wheel_times[data.wheel_id-1]).secs # TODO: Is this in seconds? It should be
+            self.last_wheel_times[data.wheel_id-1] = data.header.stamp
+        #
         
         if data.wheel_id == 1:   # Front-left
             self.front_left_angle = data.steering_angle
@@ -64,7 +69,7 @@ class CommandToAngles:
         self.remaining_amp_hours      -= dt*self.amp_list[data.wheel_id-1]/3600.0
         
         # TODO: Maybe allow for non-drive motors being hottest?
-        self.drive_temp_list[data.wheel_id-1] = data.drive_temp )
+        self.drive_temp_list[data.wheel_id-1] = data.drive_temp
         
         # TODO: Derive speed from avg RPM and wheel diameter?
         # TODO: Should we display distance driven?
@@ -83,8 +88,13 @@ class CommandToAngles:
         
         """
         
-        dt = data.header.stamp - self.last_pose_time
-        self.last_pose_time = data.header.stamp
+        if self.last_pose_time == -1:
+            self.last_pose_time = data.header.stamp
+            return
+        else:
+            dt = (data.header.stamp - self.last_pose_time).secs
+            self.last_pose_time = data.header.stamp
+        #
         
         self.speed   = data.speed # TODO: Derive speed from avg RPM and wheel diameter?
         self.roll    = data.roll

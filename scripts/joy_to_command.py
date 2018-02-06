@@ -147,7 +147,8 @@ class JoyToCommand:
         speed = self.joyState['joyYAxis']
         strafeAngle=0
         turnX = 0
-
+        isBraking = False
+        
 	#
 
         if (self.joyState['joyXAxis'] != 0.0):

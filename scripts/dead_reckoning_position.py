@@ -23,7 +23,7 @@ class DeadReckoning:
         self.northing = 0.0
         self.easting = 0.0
         
-        self.timestamp = rospy.Time.now()
+        self.timestamp = -1
         
         self.pub = rospy.Publisher('tycho/rover_position_orientation', RoverPosition)
     #
@@ -37,15 +37,20 @@ class DeadReckoning:
         """
         
         # Get time delta
-        dt = data.header.stamp - self.timestamp # TODO: Is this in seconds? It should be
-        self.timestamp = data.header.stamp
+        if self.timestamp == -1:
+            self.timestamp = data.header.stamp
+            return
+        else:
+            dt = (data.header.stamp - self.timestamp).secs # TODO: Is this in seconds? It should be
+            self.timestamp = data.header.stamp
+        #
         
         self.speed = data.speed
         distance_travelled = data.speed * dt
         
         
         # Calculate new heading
-        if ! data.is_strafing:
+        if not data.is_strafing:
             if data.turn_center_x > 0:
                 turn_direction = -1 # TODO: is this the right sign?
             else:
@@ -58,11 +63,11 @@ class DeadReckoning:
         else:
             # Strafing: Just update the position
             self.northing = self.northing + distance_travelled*cos(self.heading_r)
-            self.easting  = self.easting  + distance_travelled*sign(self.heading_r)
+            self.easting  = self.easting  + distance_travelled*sin(self.heading_r)
         #
         
         
-        createMessage()
+        self.createMessage()
     #
     
     def createMessage(self):

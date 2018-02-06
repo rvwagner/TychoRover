@@ -52,6 +52,8 @@ add_message_files(
   WheelAnglesSpeeds.msg
   RoverDriveCommand.msg
   WheelStatus.msg
+  RoverPosition.msg
+  DisplayPanel.msg
 )
 
 ## Generate services in the 'srv' folder
