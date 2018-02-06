@@ -18,7 +18,7 @@ Assembly instructions:
 1) Print out all parts (see end of file).  You may wish to start by printing one of
    each part (epecially the Motor Grippers) to check the fit for your printer.
 1x Frame
-2x Front Beams
+2x Front Beams (or 1x Front Beam and 1x Front Beam With Pi Mount)
 4x Motor Grippers (check the printing path preview to make sure that there is only a single layer between the servo horn cavity on the bottom and the screw-hole above it)
 4x Wheels
 4x Wheel Grippers
@@ -127,8 +127,9 @@ Arduino     Servo
 
 $fn = 100;
 
-margin = 0.5; // Extra buffer to account for printing error
-innermargin = 1; // Same, but for small internal holes
+margin = 0.1; // Extra buffer to account for printing error
+innermargin = 0.3; // Same, but for small internal holes
+wheel_grip_tweak = 0.6; // Extra distance between pegs of wheel gripper, added to width of wheel spokes
 
 X=25.4/10; // Scale factor compared to full-size rover
 
@@ -139,8 +140,8 @@ driveMotorRadius = 12/2 +margin/2;
 driveMotorFlatRadius = 10/2;
 driveMotorSideWidth = 8 +margin;
 driveMotorCaseLength = 15.6 +margin;
-driveMotorShaftRadius = 3/2 + 0.35; // 2.0 is a hair too big for 3mm shafts // 1.49mm radius is a (difficult) press-fit for 2mm shafts
-driveMotorShaftinset = 3 - 2.44 - 0.15; // Final number is press-fit calibration (for 0.25mm layer thickness, BfB 3DTouch printer)
+driveMotorShaftRadius = 3/2 + 0.2; // 2.0 is a hair too big for 3mm shafts // 1.49mm radius is a (difficult) press-fit for 2mm shafts
+driveMotorShaftinset = 3 - 2.44 - 0.1; // Final number is press-fit calibration (for 0.1mm layer thickness, Fusion3 F400)
 driveMotorGearboxLength = 9;
 
 // SG90 servos: https://www.amazon.com/gp/product/B015H5AVZG
@@ -158,7 +159,7 @@ servoAxisOffset = 5.1; // Offset from the center of the servo to the rotation ax
 // Specs for the single-direction servo horn that came with the servos
 servoArmMountRadius = 6.9/2 +margin; // center of rotation to outside of central mount
 servoArmLength = 19.6 - servoArmMountRadius +margin*3; // center of rotation to tip of arm
-servoArmThickness = 1.5 +innermargin;
+servoArmThickness = 1.5 +innermargin*2;
 servoArmNarrowWidth = 4.1 +innermargin;
 servoArmWideWidth = 5.4 +innermargin;
 
@@ -180,7 +181,7 @@ batteryHeight = 26.6 + margin;
 
 
 // A few relevant specifications about the rover frame (for the Front Bar module)
-frontPlateThickness = 2;
+frontPlateThickness = 2; // 5 loops at 0.4; 4 loops at 0.5 mm path width
 frontPlateWidth = 6*X;
 front_section_width = 7.35*X;
 bar_width = 2*X;
@@ -234,6 +235,7 @@ module strainReliefLoop(){
 
 // Steering arm that connects the gearmotor to the servo
 module motorGrip(length = 13.6, thickness = 1) { // For motor entirely outside wheel: length = 13.6
+    bridge_membrane_thickness = 0.2; // Should produce a single layer with your printing settings (note: S3D apparently can't do a 1-layer bridge)
     motorClipThickness = thickness*1.65;
     driveMotorTotalLength = driveMotorCaseLength + driveMotorGearboxLength;
     mountThickness = thickness*2 + servoArmThickness;
@@ -261,12 +263,12 @@ module motorGrip(length = 13.6, thickness = 1) { // For motor entirely outside w
             // Servo screw hole, with thin layer for 
             translate([length-driveMotorTotalLength/2,0,0]) difference(){
                 cylinder(backboneThickness+1, servoScrewRadius, servoScrewRadius, center=true);
-                translate([0,0,-backboneThickness/2+thickness-0.1]) cube([servoScrewRadius*3,servoScrewRadius*3,0.2], center=true);
+                translate([0,0,-backboneThickness/2+thickness-0.1]) cube([servoScrewRadius*3, servoScrewRadius*3, bridge_membrane_thickness], center=true);
             }
             // Deep opening for the arm
             translate([length-driveMotorTotalLength/2-servoArmLength/2,0,0]) intersection(){
                 cube([servoArmLength,servoArmMountRadius*2,servoArmThickness], center=true);
-                rotate([0,90,0])cylinder(servoArmLength, servoArmNarrowWidth/2, servoArmWideWidth/2, center=true);
+                rotate([0,90,0])rotate([0,0,45])cylinder(servoArmLength, servoArmNarrowWidth*sqrt(2)/2, servoArmWideWidth*sqrt(2)/2, center=true, $fn=4);
             }
             
             // Ziptie notch
@@ -378,25 +380,37 @@ module pressfittest(count = 6, thickness=spoke_size){
 }
 
 // Part that clips into long-printing wheel and interfaces with the motor shaft.
-module wheel_gripper(){    
-    pegOffset = 8.75;
+use <threads.scad>
+module wheel_gripper_setscrew(){    
+    pegHeight = spoke_size*1.1;
     pegRadius = spoke_size*2/3;
+    peg_center_center = 2 * (spoke_size/2 + pegRadius + wheel_grip_tweak/2);
+    grip_width = peg_center_center + pegRadius*2;
+    
+    pegOffset = (peg_center_center/2)/sin(22.5);
+    //pegOffset = 8.75;
+    //echo(pegOffset);
+    
     // Full wheel assembly
     translate([0,0,(-tire_width+spoke_size)/2]) union(){
-        rotate([0,0,45/2]){
-                for(i=[0:45:359]) rotate([0,0,i]) translate([pegOffset,0,0])
-                    cylinder(spoke_size*2,pegRadius,pegRadius, center=true);
-        }
-        translate([0,0,-spoke_size])difference(){
-            cylinder(spoke_size,pegOffset+pegRadius,pegOffset+pegRadius, center=true);
-            difference(){
-                cylinder(spoke_size+1, driveMotorShaftRadius, driveMotorShaftRadius, center=true);
-                translate([driveMotorShaftRadius,0,0])cube([driveMotorShaftinset*3,driveMotorShaftRadius*3,spoke_size+2], center=true);
+        for(i=[67.5,112.5,-67.5,-112.5]) rotate([0,0,i]) translate([pegOffset,0,0])
+            cylinder(pegHeight,pegRadius,pegRadius, center=true);
+        translate([0,0,-pegHeight/2-spoke_size])difference(){
+            intersection(){
+                cylinder(spoke_size*2,pegOffset+pegRadius,pegOffset+pegRadius, center=true);
+                cube([grip_width,(pegOffset+pegRadius)*3,10], center=true);
             }
+            difference(){
+                cylinder(spoke_size*2+1, driveMotorShaftRadius, driveMotorShaftRadius, center=true);
+                translate([driveMotorShaftRadius,0,0])cube([driveMotorShaftinset*3,driveMotorShaftRadius*3,spoke_size*2+2], center=true);
+            }
+            translate([0,0,-0.5])rotate([0,90,0])metric_thread (diameter=3+0.1, pitch=0.45, length=grip_width/2+1, internal=false); // M2.5 x .45
         }
     }
+    
+    
 }
-wheel_gripper();
+wheel_gripper_setscrew();
 
 // Spacer 
 module wheel_bushing(thickness=1){
@@ -414,29 +428,24 @@ module frontBeam(){
     
     // Servo mount
     module servoMount(){
-    translate([0,servoAxisOffset,0])difference() {
-        union(){
-            cube([frontPlateThickness,servoCaseLength+servoScrewMountWidth*2,frontPlateWidth], center=true);
-            translate([-servoMountOffset/2,-servoCaseLength/2-servoScrewMountWidth/2,0])cube([servoMountOffset,servoScrewMountWidth,frontPlateWidth], center=true);
-            translate([-servoMountOffset/2, servoCaseLength/2+servoScrewMountWidth/2,0])cube([servoMountOffset,servoScrewMountWidth,frontPlateWidth], center=true);
-        
+        translate([0,servoAxisOffset,0])difference() {
+            union(){
+                cube([frontPlateThickness,servoCaseLength+servoScrewMountWidth*2,frontPlateWidth], center=true);
+                translate([-servoMountOffset/2,-servoCaseLength/2-servoScrewMountWidth/2,0])cube([servoMountOffset,servoScrewMountWidth,frontPlateWidth], center=true);
+                translate([-servoMountOffset/2, servoCaseLength/2+servoScrewMountWidth/2,0])cube([servoMountOffset,servoScrewMountWidth,frontPlateWidth], center=true);
+            
+            }
+            translate([0, -servoCaseLength/2+servoGearboxLength/2,0]) cube([servoCaseLength,servoGearboxLength,servoCaseWidth], center=true);
+            translate([0, servoScrewCenterDistance/2,0])rotate([0,90,0])
+                cylinder(servoCaseLength, servoMountScrewRadius,servoMountScrewRadius, center=true);
+            translate([0,-servoScrewCenterDistance/2,0])rotate([0,90,0])
+                cylinder(servoCaseLength, servoMountScrewRadius,servoMountScrewRadius, center=true);
         }
-        translate([0, -servoCaseLength/2+servoGearboxLength/2,0]) cube([servoCaseLength,servoGearboxLength,servoCaseWidth], center=true);
-        translate([0, servoScrewCenterDistance/2,0])rotate([0,90,0])
-            cylinder(servoCaseLength, servoMountScrewRadius,servoMountScrewRadius, center=true);
-        translate([0,-servoScrewCenterDistance/2,0])rotate([0,90,0])
-            cylinder(servoCaseLength, servoMountScrewRadius,servoMountScrewRadius, center=true);
-    }
     }
     
-    servoMountLength = servoCaseLength + servoScrewMountWidth - (servoCaseLength/2-servoAxisOffset);
-    
-    // Top plate
-    cube([frontPlateThickness,(wheelJointDistance-servoMountLength)*2+0.01,frontPlateWidth], center=true);
-    translate([0,-wheelJointDistance,0])servoMount();
-    translate([0, wheelJointDistance,0])rotate([180,0,0])servoMount();
     
     // Frame connection
+    module frameConnection(){
     difference(){
         holeWidth = bar_width+innermargin*1.25;
         union(){
@@ -449,6 +458,20 @@ module frontBeam(){
         translate([(bar_height+innermargin+frontPlateThickness)/2,-front_section_width/2,frontPlateWidth/2-margin])
             cube([bar_height+innermargin, holeWidth, frontPlateWidth], center=true);
     }
+    }
+    
+    
+    frameConnection();
+    
+    servoMountLength = servoCaseLength + servoScrewMountWidth - (servoCaseLength/2-servoAxisOffset);
+    
+    // Top plate
+    cube([frontPlateThickness,(wheelJointDistance-servoMountLength)*2+0.01,frontPlateWidth], center=true);
+    translate([0,-wheelJointDistance,0])servoMount();
+    translate([0, wheelJointDistance,0])rotate([180,0,0])servoMount();
+    
+    
+    
     // Bottom plate
     translate([(bar_height+innermargin+frontPlateThickness), 0,0])
         cube([frontPlateThickness,(wheelJointDistance-servoMountLength)*2,frontPlateWidth], center=true);
@@ -461,7 +484,41 @@ module frontBeam(){
     
 }
 
-
+module frontBeam_With_RPi_Mount(){
+    screw_mount_r = 1.35 + frontPlateThickness;
+    hole_to_hole = 46.7;
+    hole_to_end = 11.7;
+    case_width = 61.2;
+    case_to_bar = 11; // Offset between edge of case and top of endbar, to 
+    case_side_offset = (82-61.5)/2; // Horizontal offset to get camera as close to center as possible
+    
+    mount_plate_width = 10;
+    mount_plate_height = case_to_bar + hole_to_end + frontPlateThickness + mount_plate_width/2;
+    
+    module rpi_mount(){
+        difference(){
+            union(){
+                cube([mount_plate_height,mount_plate_width,frontPlateThickness], center=true);
+                translate([mount_plate_height-case_to_bar-frontPlateThickness,0,frontPlateWidth-frontPlateThickness]/2)
+                    cube([case_to_bar+frontPlateThickness,frontPlateThickness,frontPlateWidth], center=true);
+                translate([mount_plate_height/2-frontPlateThickness-case_to_bar-hole_to_end,0,frontPlateThickness/2])
+                    cylinder(frontPlateThickness*2,screw_mount_r, screw_mount_r, center=true);
+            }
+            translate([mount_plate_height/2-frontPlateThickness-case_to_bar-hole_to_end,0,-frontPlateThickness*1.5+1])
+                //metric_thread (diameter=2.0, pitch=0.45, length=frontPlateThickness*2.5, internal=false); // M2 x .45
+                english_thread (diameter=0.086, threads_per_inch=56, length=frontPlateThickness*2.5/25.4, internal=false); // 2-56
+        }
+    }
+    
+    rotate([180,0,0])frontBeam();
+    translate([-mount_plate_height+frontPlateThickness,-case_side_offset,-frontPlateWidth+frontPlateThickness]/2) union(){
+        translate([0, hole_to_hole/2,0]) rpi_mount();
+        translate([0,-hole_to_hole/2,0]) rpi_mount();
+    }
+    
+    
+    
+}
 
 
   ///////////
@@ -605,14 +662,11 @@ wireManagementClip(14, 30); // Phone battery pack (print 2)
 wireManagementClip(27, 20); // LiFe Battery (print 2)
 
 
-!rotate([180,0,0])motorGrip(length = 16.5+tire_width); // Print 4
-frontBeam(); // Print 2
+rotate([180,0,0])motorGrip(length = 16.5+tire_width); // Print 4
+frontBeam(); // Print 1
+!frontBeam_With_RPi_Mount(); // Print 1
 wheel_printable(); // Print 4
-wheel_gripper(); // Print 4
+rotate([0,90,0]) wheel_gripper_setscrew(); // Print 4 (suggested layer thickness: 0.1mm)
 wheel_bushing(); // Print 4
-frame();
-
-// Also need to print a 10:1 frame with no end bars from the rover articulated model
-
-
+frame(); // Print 1
 
