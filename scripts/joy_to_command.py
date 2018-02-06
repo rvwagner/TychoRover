@@ -26,8 +26,10 @@ class JoyToCommand:
         self.buttonMap['joyXAxis'] = 0
         self.buttonMap['joyYAxis'] = 1
         self.buttonMap['modeSideways'] = 1
-        self.buttonMap['modeCircleStrafe'] = -1
+        self.buttonMap['modeCircleStrafe'] = 4
         self.buttonMap['modeReverse'] = 0
+	#Testing modeNeutral option for turnInPlace - Jacob Hicks
+	self.buttonMap['modeNeutral'] = 3
         self.buttonMap['stopButton'] = 2
         
         self.joyState = {}
@@ -36,12 +38,11 @@ class JoyToCommand:
         self.joyState['modeSideways'] = 0
         self.joyState['modeCircleStrafe'] = 0
         self.joyState['modeReverse'] = 0
+	#Testing modeNeutral option for turnInPlace - Jacob Hicks
+	self.joyState['modeNeutral'] = 0
         self.joyState['stopButton'] = 0
         self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand)
-    #
-    
-     
-    
+
     # Receives joystick messages (subscribed to Joy topic)
     # then converts the joysick inputs into Twist commands
     # axis 1 aka left stick vertical controls linear speed
@@ -69,6 +70,8 @@ class JoyToCommand:
         hasChanged = updateValueIfNeeded('joyYAxis', isAxis=True) or hasChanged
         hasChanged = updateValueIfNeeded('modeSideways') or hasChanged
         hasChanged = updateValueIfNeeded('modeReverse') or hasChanged
+	hasChanged = updateValueIfNeeded('modeNeutral') or hasChanged
+	hasChanged = updateValueIfNeeded('modeCircleStrafe') or hasChanged
         
         # Prevent killswitch disable unless joystick is neutral
         if self.joyState['stopButton'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
@@ -78,17 +81,33 @@ class JoyToCommand:
             self.interpretJoystick()
     #
     
+    # TODO: Why don't wheels return forward after leaving turnInPlace?
     def interpretJoystick(self):
-
+	
         if self.joyState['modeSideways'] == 1:
-            self.interpretStrafe()
-        else:
-	    print ('send to interp normal')
-	    print (self.joyState['modeReverse'])
-            self.interpretNormal()
-        
+	    print('sending to interpretStrafe()')
+	    self.interpretStrafe()
+
+	elif self.joyState['modeNeutral'] == 1:
+	    isBraking = True
+	    if abs(self.joyState['joyYAxis'] == 0):
+		print('sending to interpretTurnInPlace()')
+	        self.interpretTurnInPlace()
+	elif self.joyState['modeCircleStrafe'] == 1:
+	    print ('sending to interpretCircleStrafe()')
+	    self.interpretCircleStrafe()
+	elif self.joyState['modeReverse'] == 1:
+	    print('sending to resetWheelState()')
+	    self.resetWheelState()
+	else:
+            self.turnY = 0
+	    self.isStrafing = True
+	    print('sending to interpretNormal()')
+	    self.interpretNormal()
+
         return
         
+	
         if self.steeringMode != "off" and self.joyState['joyXAxis'] == 0.0 and self.joyState['joyYAxis'] == 0.0:
 	    self.steeringMode = "off"
             self.joyState['modeReverse'] = 1
@@ -98,7 +117,7 @@ class JoyToCommand:
         elif self.steeringMode == "off" and self.joyState['joyYAxis'] > 0.15:
             self.steeringMode = "normal"
         elif self.steeringMode == "off" and abs(self.joyState['joyXAxis']) > 0.1:
-            self.steeringMode = "inplace"
+	    self.steeringMode = "inplace"
         #
         
         print(self.steeringMode)
@@ -113,28 +132,42 @@ class JoyToCommand:
         #
     #
     
-    def interpretNormal(self):
+    def resetWheelState(self):
+	
+	speed = self.joyState['joyYAxis']
+        strafeAngle=0
+        turnX = 0
 
+	self.publishCommandMessage(speed=0, turnX=0.01, turnY=0.01, strafeAngle=0.01, isStrafing=True, isBraking=True);
+
+    #
+
+    def interpretNormal(self):
+	print('reached interpretNormal()')
         speed = self.joyState['joyYAxis']
         strafeAngle=0
         turnX = 0
 
+	#
+
         if (self.joyState['joyXAxis'] != 0.0):
             turnY = -1/self.joyState['joyXAxis']
             isStrafing = False
-        else:
-            turnY = 0
-            isStrafing = True
-	 #
-	
-	if (self.joyState['joyYAxis'] == 0):
-		isBraking = True
-	else: 
-		isBraking = False
+	else:
+	    turnY = 0
+	    isStrafing = True
+	#
+	 
+	# Added to brake the rover if joystick is in neutral pos. -Jacob Hicks
+	if (self.joyState['joyYAxis'] == 0) or (self.joyState['stopButton'] == 1):
+	    isBraking = True
 
-	if(self.joyState['joyYAxis'] < 0):
-		self.joyState['modeReverse'] = 1		
-        
+	#
+
+	# Put rover into reverse mode if joystick is oriented backwards. -Jacob Hicks
+	if (self.joyState['joyYAxis'] < 0):
+	    self.joyState['modeReverse'] = 1
+
         # Rotate the steering axis so that strafeAngle is forward
         # Not actually useful, but fun.
         #strafeAngle = 45
@@ -145,6 +178,7 @@ class JoyToCommand:
     #
     
     def interpretStrafe(self):
+	print('reached interpretStrafe()')
         speed = sqrt(self.joyState['joyXAxis']**2 + self.joyState['joyYAxis']**2)
         if self.joyState['joyYAxis'] < 0: speed = abs(self.joyState['joyXAxis'])
         
@@ -158,7 +192,7 @@ class JoyToCommand:
         
         # TODO If reverse mode active
         #if self.joyState['joyYAxis'] < 0: speed = -speed
-        if self.joyState['joyYAxis'] <= 0.0:
+        if self.joyState['joyYAxis'] == 0:
 	    speed = 0
             isBraking = True
         else:
@@ -173,11 +207,22 @@ class JoyToCommand:
     #
     
     def interpretTurnInPlace(self):
+	print('reached interpretTurnInPlace()')
 	speed = self.joyState['joyXAxis']
+	
         isBraking = (self.joyState['joyYAxis'] <= -0.75)
         self.publishCommandMessage(speed, turnX=0, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
     #
-    
+
+    def interpretCircleStrafe(self):
+	print('reached interpretCircleStrafe()')
+	speed = self.joyState['joyXAxis']
+	
+	isBraking = (self.joyState['joyYAxis'] <= -0.75)
+        self.publishCommandMessage(speed, turnX=2, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
+
+    #
+
     def publishCommandMessage(self, speed, turnX, turnY, strafeAngle, isStrafing, isBraking):
         # In case of kill switch, override all other values
         if self.joyState['stopButton'] == 1:

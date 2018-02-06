@@ -67,8 +67,8 @@ class CommandToAngles:
 	    self.createCommandMessage()
         else:
             self.speed = data.speed
-            #self.setVehicleSpeed(0)
-            #self.createCommandMessage()
+            self.setVehicleSpeed(self.speed)
+            self.createCommandMessage()
             #return
         #
         
@@ -141,6 +141,10 @@ class CommandToAngles:
             distY = turnCenterY-self.jointY[i];
             distX = turnCenterX-self.jointX[i];
             angles[i] = atan(distX/distY)*180/pi+90;
+	    circlingPoint = False
+
+	    if abs(turnCenterX) > self.jointX['FrontLeft'] and abs(turnCenterY) < self.jointY['FrontLeft']:
+		circlingPoint = True
             
             # Calculate the distance to the turning point based on whether
             # steering arm points towards or away from the turn point
@@ -167,13 +171,13 @@ class CommandToAngles:
         # B) Reverse the left-hand wheels
         # TODO: Add variables for joint X and Y positions in general, rather than relying on joint[1] being positive
         
-        if abs(turnCenterX) < self.jointX['FrontLeft'] and abs(turnCenterY) < self.jointY['FrontLeft']:
-            
+        if (abs(turnCenterX) < self.jointX['FrontLeft'] and abs(turnCenterY) < self.jointY['FrontLeft']) or circlingPoint == True:
+
             self.speedMultipliers['FrontLeft']  =  -self.speedMultipliers['FrontLeft']  / maxMultiplier;
             self.speedMultipliers['FrontRight'] =  self.speedMultipliers['FrontRight'] / maxMultiplier;
             self.speedMultipliers['BackLeft']   =  -self.speedMultipliers['BackLeft']   / maxMultiplier;
             self.speedMultipliers['BackRight']  =  self.speedMultipliers['BackRight']  / maxMultiplier;
-            
+           
         #
         #// Adjust the current drive speed based on the new speed multipliers
         #setVehicleSpeed(currentSpeed);
