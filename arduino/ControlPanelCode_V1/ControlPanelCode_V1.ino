@@ -1,3 +1,4 @@
+
 /*
   Circuit:            7 Segment Display 
   5v   -------------------- VCC
@@ -12,6 +13,8 @@
 */
 
 #include <SPI.h>
+#include "LedControl.h"
+
 #define ROS
 
 #ifdef ROS
@@ -21,6 +24,10 @@ ros::NodeHandle nh;
 #endif
 
 // Assign each display a pin on the arduino.
+LedControl lc = LedControl(30,33,31,1);
+
+unsigned long delayTime = 200; //For testing purposes
+
 const int speedPin = 31;
 const int pitchPin = 33;
 const int rollPin = 34;
@@ -38,6 +45,7 @@ float max_drive_temp = 0;
 float roll = 0;
 float pitch = 0;
 float heading = 0;
+
 int hottest_motor_id = 0;
 
 char tempString[10]; // char array for printing data to displays
@@ -60,20 +68,25 @@ ros::Subscriber<tycho::DisplayPanel> displaySub("tycho/display_values", &rosSetD
 ////////////////////
 void setup()
 {
+  lc.shutdown(0, false);
+  lc.setIntensity(0,5);
+  lc.clearDisplay(0);
+ 
   // --------Initialize SPI pins
   pinMode(speedPin, OUTPUT);
   pinMode(pitchPin, OUTPUT);
+  //pinMode(rollPin, OUTPUT);
   pinMode(headingPin, OUTPUT);
   pinMode(tempPin, OUTPUT);
   digitalWrite(speedPin, HIGH);
   digitalWrite(pitchPin, HIGH);
+  //digitalWrite(rollPin, HIGH);
   digitalWrite(headingPin, HIGH);
   digitalWrite(tempPin, HIGH);
   SPI.begin();
   SPI.setClockDivider(SPI_CLOCK_DIV64);
   
   clearDisplaySPI();
-  setDecimalsSPI(speedPin, 0b111111); 
   
   setBrightnessSPI(255);
   
@@ -90,7 +103,7 @@ void setup()
 
 void loop()
 {
-  demoLoop();
+  display_angles(45, 130, 0, 45);
   
   //nh.spinOnce();
   delay(10);
@@ -99,94 +112,101 @@ void loop()
 ///////////////////////
 // Display Functions //
 ///////////////////////
-void displaySpeed(float tykeSpeed)
-{
-   int floatInInt;
-   
-   if(tykeSpeed <=1)
-   {
-      floatInInt = (int)(tykeSpeed * 1000); 
-   }
-   
-   floatInInt = (int)(tykeSpeed * 100);
-   
-   sprintf(tempString, "%4d", floatInInt);
-   segStringSPI(speedPin, tempString);
-   
-   if(tykeSpeed < 100)
-      setDecimalsSPI(speedPin, 0b00000010); 
-   else
-     setDecimalsSPI(speedPin, 0b00000100);
-}
 
-void displayHeading(float tykeHeading)
+void displayValue(int pinNumber, float dispValue)
 {
-  int floatInInt;
-  if(tykeHeading <= 1)
-    floatInInt = (int)(tykeHeading * 1000);
-  else
-    floatInInt = (int)(tykeHeading * 100);
-  
-  sprintf(tempString, "%4d", floatInInt);
-  segStringSPI(headingPin, tempString);
-  
-  if(tykeHeading < 100)
-    setDecimalsSPI(headingPin, 0b00000010);
-  else
-    setDecimalsSPI(headingPin, 0b00000100);
+    int floatInInt;
     
-}
-
-void displayRoll(float roll)
-{
-  int floatInInt;
-  
-  floatInInt = (int)(roll * 100);
-  
-  sprintf(tempString, "%4d", floatInInt);
-  segStringSPI(pitchPin, tempString);
-  
-  if(roll < 100)
-    setDecimalsSPI(pitchPin, 0b00000010);
-  else
-    setDecimalsSPI(pitchPin, 0b00000100);
+    setDecimalsSPI();
     
-}
-
-void displayPitch(float pitch)
-{
-  int floatInInt;
-  
-  floatInInt = (int)(pitch * 100);
-  
-  sprintf(tempString, "%4d", floatInInt);
-  segStringSPI(pitchPin, tempString);
-  
-  if(pitch < 100)
-    setDecimalsSPI(pitchPin, 0b00000010);
-  else
-    setDecimalsSPI(pitchPin, 0b00000100);
-}
-
-void displayTemp(float tykeTemp)
-{
-  int floatInInt;
-  
-  if(tykeTemp <= 1)
-    floatInInt = (int)(tykeTemp * 1000);
-  else
-    floatInInt = (int)(tykeTemp * 100);
-  
-  sprintf(tempString, "%4d", floatInInt);
-  segStringSPI(tempPin, tempString);
-  
-  if(tykeTemp < 100)
-    setDecimalsSPI(tempPin, 0b00000010);
-  else
-    setDecimalsSPI(tempPin, 0b00000100);
+    if(dispValue <= 1) 
+    {
+       floatInInt = (int)(dispValue * 100); 
+    } 
+    else {
+      floatInInt = (int)(dispValue * 10);
+    }
     
+    sprintf(tempString, "%4d", floatInInt);
+    segStringSPI(pinNumber, tempString);
+    
+    setDecimalsSPI();
+  
 }
 
+////////////////////
+// Display Angles //
+////////////////////
+byte degree0[] =
+{
+  B00000010,
+  B00000010,
+  B00000010
+};
+
+byte degree45[] =
+{
+  B00000100,
+  B00000010,
+  B00000001
+};
+
+byte degree90[] =
+{
+  B00000000,
+  B00000111,
+  B00000000
+};
+
+byte degree135[] =
+{
+  B00000001,
+  B00000010,
+  B00000100
+};
+
+void display_angles(float front_left_angle, float front_right_angle, float back_left_angle, float back_right_angle) {
+  
+ byte fullDisplay[] =
+{
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000
+};
+
+  //top right
+  for(int i = 0; i < 3; i++)
+  {
+    fullDisplay[i] = fullDisplay[i] | wheelAngle(front_right_angle)[i];
+  } 
+  
+  //bottom right
+  for(int i = 0; i < 3; i++)
+  {
+    fullDisplay[i+5] = fullDisplay[i+5] | wheelAngle(back_right_angle)[i]; 
+  }
+  
+  //top left
+  for(int i = 0; i < 3; i++)
+  {
+    fullDisplay[i] = fullDisplay[i] | wheelAngle(front_left_angle)[i] << 5;
+  }
+  
+  //bottom left
+  for (int i = 0; i < 3; i++)
+  {
+    fullDisplay[i+5] = fullDisplay[i+5] | wheelAngle(back_left_angle)[i] << 5; 
+  } 
+  
+  for(int i = 0; i < 8; i++){
+    lc.setRow(0, i, fullDisplay[i]); 
+  }
+}
 //////////////////////
 // Helper Functions //
 //////////////////////
@@ -208,11 +228,13 @@ void clearDisplaySPI()
 {
   digitalWrite(speedPin, LOW);
   digitalWrite(pitchPin, LOW);
+  digitalWrite(rollPin, LOW);
   digitalWrite(headingPin, LOW);
   digitalWrite(tempPin, LOW);
   SPI.transfer(0x76); // Clear display command
   digitalWrite(speedPin, HIGH);
   digitalWrite(pitchPin, HIGH);
+  digitalWrite(rollPin, HIGH);
   digitalWrite(headingPin, HIGH);
   digitalWrite(tempPin, HIGH);
 }
@@ -222,24 +244,54 @@ void setBrightnessSPI(byte value)
 {
   digitalWrite(speedPin, LOW);
   digitalWrite(pitchPin, LOW);
+  digitalWrite(rollPin, LOW);
   digitalWrite(headingPin, LOW);
   digitalWrite(tempPin, LOW); 
   SPI.transfer(0x7A);  // Set brightness command byte
   SPI.transfer(value); // Brightness data byte
   digitalWrite(speedPin, HIGH);
   digitalWrite(pitchPin, HIGH);
+  digitalWrite(rollPin, HIGH);
   digitalWrite(headingPin, HIGH);
   digitalWrite(tempPin, HIGH);
 }
 
 // Function to set the decimals for the displays
-void setDecimalsSPI(const int pin, byte decimals)
+void setDecimalsSPI()
 {
-  digitalWrite(pin, LOW);
+  digitalWrite(speedPin, LOW);
+  digitalWrite(pitchPin, LOW);
+  digitalWrite(rollPin, LOW);
+  digitalWrite(headingPin, LOW);
+  digitalWrite(tempPin, LOW);
   SPI.transfer(0x77); // Set decimal command byte
-  SPI.transfer(decimals);
-  digitalWrite(pin, HIGH);
+  SPI.transfer(0b00000100);// Set to 1 decimal place
+  digitalWrite(speedPin, HIGH);
+  digitalWrite(pitchPin, HIGH);
+  digitalWrite(rollPin, HIGH);
+  digitalWrite(headingPin, HIGH);
+  digitalWrite(tempPin, HIGH);
+}
 
+// Function to return wheel angles for the matrix display. 
+byte* wheelAngle(float angle)
+{
+  if(angle >= 0 && angle < 45)
+  {
+    return degree0; 
+  }
+  else if(angle >= 45 && angle < 90)
+  {
+    return degree45; 
+  }
+  else if(angle >= 90 && angle < 120)
+  {
+    return degree90;
+  } 
+  else if(angle >= 120 && angle < 135)
+  {
+    return degree135;
+  }
 }
 
 /////////////////////
@@ -247,17 +299,17 @@ void setDecimalsSPI(const int pin, byte decimals)
 /////////////////////
 void demoLoop()
 {
-  displaySpeed(50.36);
-  displayRoll(10.21);
-  displayTemp(120.1);
-  displayHeading(66.6);
-  delay(2000);
-  clearDisplaySPI();
-  displaySpeed(123.34);
-  displayRoll(100);
-  displayTemp(12.54);
-  displayHeading(77.7);
-  delay(2000);
+  
+  displayValue(speedPin, 50.36);
+  displayValue(pitchPin, 1.52);
+  displayValue(tempPin, 120.2);
+  displayValue(headingPin, 84.3);
+  
+  delay(3000);
+  //displaySpeed(50.36);
+  //displayRoll(10.21);
+  //displayTemp(120.1);
+  //displayHeading(66.6);
 }
 
 
