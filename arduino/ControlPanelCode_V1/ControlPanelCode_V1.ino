@@ -20,9 +20,21 @@
 
 #include <SPI.h>
 #include <Servo.h>
+#include <Wire.h>
+#include <SparkFunLSM9DS1.h>
 #include "LedControl.h"
 
+//Create LSM9DS1 object
+LSM9DS1 imu;
+
 #define ROS
+
+#define LSM9DS1_M    0x1E
+#define LSM9DS1_AG   0x6B
+
+#define PRINT_CALCULATED
+#define DECLINATION -10.13 //Tempe Arizona Declination
+#define PRINT_SPEED 2000
 
 #ifdef ROS
 #include <ros.h>
@@ -72,9 +84,9 @@ Servo servos[4];
 void rosSetDisplayValues(const tycho::DisplayPanel& values){
   
   displayValue(speedPin, values.speed);
-  displayValue(pitchPin, values.pitch);
-  displayValue(rollPin, values.roll);
-  displayValue(headingPin, values.heading);
+  displayValue(pitchPin, retPitch(imu.ax, imu.ay, imu.az));
+  displayValue(rollPin, retRoll(imu.ay, imu.az));
+  displayValue(headingPin, retHeading(-imu.my, -imu.mx));
   displayValue(tempPin, values.max_drive_temp);
   
     /* Handle warning flags on arduino?
@@ -123,6 +135,23 @@ ros::Subscriber<tycho::DisplayPanel> displaySub("tycho/display_values", &rosSetD
 void setup()
 {
   
+  //Configure LSM9DS1
+  imu.settings.device.commInterface = IMU_MODE_I2C;
+  imu.settings.device.mAddress = LSM9DS1_M;
+  imu.settings.device.agAddress = LSM9DS1_AG;
+  
+  if(!imu.begin()) 
+  {
+    Serial.println("Failed to communicate with LSM9DS1.");
+    Serial.println("Double-check wiring.");
+    Serial.println("Default settings in this sketch will " \
+                   "work for an out of the box LSM9DS1 " \
+                   "Breakout, but may need to be modified " \
+                   "if the board jumpers are.");
+    while(1)
+      ;
+  }
+  
   servos[0].attach(temp_warning);
   servos[1].attach(slope_warning);
   servos[2].attach(speed_warning);
@@ -136,12 +165,12 @@ void setup()
   // --------Initialize SPI pins
   pinMode(speedPin, OUTPUT);
   pinMode(pitchPin, OUTPUT);
-  //pinMode(rollPin, OUTPUT);
+  pinMode(rollPin, OUTPUT);
   pinMode(headingPin, OUTPUT);
   pinMode(tempPin, OUTPUT);
   digitalWrite(speedPin, HIGH);
   digitalWrite(pitchPin, HIGH);
-  //digitalWrite(rollPin, HIGH);
+  digitalWrite(rollPin, HIGH);
   digitalWrite(headingPin, HIGH);
   digitalWrite(tempPin, HIGH);
   SPI.begin();
@@ -150,17 +179,22 @@ void setup()
   setBrightnessSPI(255);
  
   #ifndef ROS
-    Serial.begin(57600);
+    Serial.begin(9600);
   #else 
     nh.initNode();
     nh.subscribe(displaySub);
+    Serial.begin(9600);
   #endif
   
 }
 
 void loop()
 {
-  
+  updateAccVals();
+  displayValue(pitchPin, retPitch(imu.ax, imu.ay, imu.az));
+  displayValue(rollPin, retRoll(imu.ay, imu.az));
+  displayValue(headingPin, retHeading(-imu.my, -imu.mx));
+  //demoLoop();
   nh.spinOnce();
   delay(10);
 
@@ -172,14 +206,58 @@ void demoLoop()
 {
   
   displayValue(speedPin, .36);
-  displayValue(pitchPin, 1.52);
   displayValue(tempPin, 120.2);
-  displayValue(headingPin, 84.3);
-  display_angles(0,0,0,0);
   
-  delay(3000);
+  delay(200);
 }
 
+void updateAccVals()
+{
+  imu.readMag();
+  imu.readAccel(); 
+  delay(200);
+}
+
+float retRoll(float ay, float az)
+{
+  roll = atan2(ay, az);
+  roll *= 180.0/PI;
+ 
+  return roll; 
+}
+
+float retPitch(float ax, float ay, float az)
+{
+  pitch = atan2(-ax, sqrt(ay * ay + az * az));
+  pitch *= 180.0/PI;
+  
+  return pitch;
+}
+
+float retHeading(float my, float mx)
+{
+  
+  if(my == 0)
+    heading = (mx < 0) ? 180.0 : 0;
+  else
+    heading = atan2(mx, my);
+    
+  heading -= DECLINATION * PI/180;
+  
+  if(heading > PI) heading -= (2*PI);
+  
+  else if (heading < -PI) heading += (2 * PI);
+  
+  else if (heading < 0) heading += 2 * PI;
+  
+  //Convert from radians to degrees
+  heading *= 180.0 / PI;
+  
+  Serial.print("Heading: " ); 
+  Serial.println(heading);
+  
+  return heading;
+} 
 ///////////////////////
 // Display Functions //
 ///////////////////////
@@ -194,7 +272,6 @@ void displayValue(int pinNumber, float dispValue)
     
     floatInInt = (int)(dispValue * 10); 
 
-    
     sprintf(tempString, "%4d", floatInInt);
     segStringSPI(pinNumber, tempString);
     
@@ -232,8 +309,6 @@ byte degree90[] =
   B00000111,
   B00000000
 };
-
-
 
 void display_angles(float front_left_angle, float front_right_angle, float back_left_angle, float back_right_angle) {
  
@@ -363,6 +438,9 @@ byte* wheelAngle(float angle)
     return degree90;
   } 
 }
+
+
+
 
 
 
