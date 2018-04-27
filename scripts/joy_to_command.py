@@ -12,7 +12,7 @@ from math import atan2, sqrt, pi
 
 class JoyToCommand:
     def __init__(self):
-        rospy.Subscriber("joy", Joy, self.callback)
+        rospy.Subscriber("joy", Joy, self.callback, queue_size=1)
         
         # Extra dead zone for transition from straight ahead to full strafe
         # In this dead zone, speed=0 and angle is a linear transition from
@@ -41,7 +41,7 @@ class JoyToCommand:
 	#Testing modeNeutral option for turnInPlace - Jacob Hicks
 	self.joyState['modeNeutral'] = 0
         self.joyState['stopButton'] = 0
-        self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand)
+        self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand, queue_size=1)
 
     # Receives joystick messages (subscribed to Joy topic)
     # then converts the joysick inputs into Twist commands
@@ -220,7 +220,7 @@ class JoyToCommand:
 	speed = self.joyState['joyXAxis']
 	
 	isBraking = (self.joyState['joyYAxis'] <= -0.75)
-        self.publishCommandMessage(speed, turnX=2, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
+        self.publishCommandMessage(speed, turnX=-3, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
 
     #
 
