@@ -72,6 +72,8 @@ class CommandToAngles:
         self.drive_temp_list[data.wheel_id-1] = data.drive_temp
         
         # TODO: Derive speed from avg RPM and wheel diameter?
+       	self.speed = data.drive_rpm/4 #* ((4*3.14)/60) #Random calculation for testing.
+
         # TODO: Should we display distance driven?
         # TODO: Should we display crows-flight distance to start?
         
