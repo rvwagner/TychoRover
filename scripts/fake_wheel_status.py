@@ -43,6 +43,8 @@ class MakeFakeWheelStatus:
         wheel1Status.wheel_id        = 1
         wheel1Status.drive_rpm       = data.front_left_speed * 175.0 # Assumes speed is scaled -1 to 1
         wheel1Status.steering_angle  = data.front_left_angle
+        print ("Front left: ")
+        print data.front_left_angle
         wheel1Status.drive_amps      = data.front_left_speed * 150
         wheel1Status.steering_amps   = 1
         wheel1Status.drive_spin_count = wheel1Status.drive_rpm / 60.0 * dt
@@ -55,6 +57,8 @@ class MakeFakeWheelStatus:
         wheel2Status.wheel_id        = 2
         wheel2Status.drive_rpm       = data.front_right_speed * 175.0
         wheel2Status.steering_angle  = data.front_right_angle
+        print ("Front right: ")
+        print data.front_right_angle
         wheel2Status.drive_amps      = data.front_right_speed * 150
         wheel2Status.steering_amps   = 1
         wheel2Status.drive_spin_count = wheel2Status.drive_rpm / 60.0 * dt
@@ -67,6 +71,8 @@ class MakeFakeWheelStatus:
         wheel3Status.wheel_id        = 3
         wheel3Status.drive_rpm       = data.back_left_speed * 175.0
         wheel3Status.steering_angle  = data.back_left_angle
+        print ("Back left: ")
+        print data.back_left_angle
         wheel3Status.drive_amps      = data.back_left_speed * 150
         wheel3Status.steering_amps   = 1
         wheel3Status.drive_spin_count = wheel3Status.drive_rpm / 60.0 * dt
@@ -79,6 +85,8 @@ class MakeFakeWheelStatus:
         wheel4Status.wheel_id        = 4
         wheel4Status.drive_rpm       = data.back_right_speed * 175.0
         wheel4Status.steering_angle  = data.back_right_angle
+        print ("Back right: ")
+        print data.back_right_angle
         wheel4Status.drive_amps      = data.back_right_speed * 150
         wheel4Status.steering_amps   = 1
         wheel4Status.drive_spin_count = wheel4Status.drive_rpm / 60.0 * dt
