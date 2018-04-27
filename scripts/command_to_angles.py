@@ -8,7 +8,7 @@ from math import atan, atan2, sqrt, pi
 
 class CommandToAngles:
     def __init__(self):
-        rospy.Subscriber("tycho/final_commands", RoverDriveCommand, self.callback)
+        rospy.Subscriber("tycho/final_commands", RoverDriveCommand, self.callback, queue_size=1)
         self.strafingAngle = 0.0
         self.turnX = 0.0
         self.turnY = 0.0
@@ -46,7 +46,7 @@ class CommandToAngles:
                        'BackLeft':  0.635, 'BackRight':  -0.635};
         self.steeringArmLength = 0.365; # Pivot to center of tire
         
-        self.pub = rospy.Publisher('tycho/low_level_motor_values', WheelAnglesSpeeds)
+        self.pub = rospy.Publisher('tycho/low_level_motor_values', WheelAnglesSpeeds, queue_size=1)
     #
     
     
