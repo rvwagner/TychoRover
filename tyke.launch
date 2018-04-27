@@ -2,15 +2,16 @@
 	<rosparam command="load" file="$(find tycho)/tycho_params.yml" />
 	<node name="joy_node" pkg="joy" type="joy_node" respawn="true" />
 	
-	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" output="screen" >
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" >
 	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
 	</node>
 	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
 	
-	<node name="dead_reckoning"    pkg="tycho" type="dead_reckoning_position.py" /> <!-- Semi-fake pose data -->
-	<node name="fake_wheel_status" pkg="tycho" type="fake_wheel_status.py" />       <!-- Mostly-fake wheel information -->
+	<!-- <node name="dead_reckoning"    pkg="tycho" type="dead_reckoning_position.py" /> --> <!-- Semi-fake pose data -->
+	<node name="fake_wheel_status" pkg="tycho" type="fake_wheel_status.py" output="screen" />  
+	<!-- Mostly-fake wheel information -->
 	<node name="sensors2display"   pkg="tycho" type="coallate_display_panel.py" />  <!-- Display panel message generator -->
 	
 	<node name="serial_bridge" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" />
-	<node name="console_serial_bridge" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB1" />
+	<node name="console_serial_bridge" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyACM0" />
 </launch>
