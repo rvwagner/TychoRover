@@ -484,41 +484,103 @@ module frontBeam(){
     
 }
 
+
+
+
+rpi_screw_mount_r = 5; //1.35 + frontPlateThickness;
+rpi_case_hole_to_hole = 9.2;
+rpi_case_mount_center_to_case_bottom = 22.3;
+rpi_case_to_bar = 11; // Offset between edge of case and top of endbar, to allow space for servos
+rpi_case_width = 61.2;
+rpi_case_side_offset = (82-rpi_case_width)/2; // Horizontal offset to get camera as close to center as possible
+
+rpi_mount_slat_half_distance = 10; // Offset from mounting holes to slide-on tab
+rpi_mount_slat_width = 5;
+rpi_mount_slat_thick = 3;
+rpi_mount_slat_length = 35;
+
 module frontBeam_With_RPi_Mount(){
-    screw_mount_r = 1.35 + frontPlateThickness;
-    hole_to_hole = 46.7;
-    hole_to_end = 11.7;
-    case_width = 61.2;
-    case_to_bar = 11; // Offset between edge of case and top of endbar, to 
-    case_side_offset = (82-61.5)/2; // Horizontal offset to get camera as close to center as possible
+    rotate([180,0,0])frontBeam();
     
-    mount_plate_width = 10;
-    mount_plate_height = case_to_bar + hole_to_end + frontPlateThickness + mount_plate_width/2;
+    // Slats to slide Raspberry Pi Adaptor onto
+    for (i = [-1,1])
+        translate([0,i*rpi_mount_slat_half_distance-rpi_case_side_offset,0]) union(){
+            translate([-rpi_mount_slat_length-rpi_case_to_bar-frontPlateThickness,0,-frontPlateWidth+rpi_mount_slat_thick]/2)
+                cube([rpi_mount_slat_length+rpi_case_to_bar, rpi_mount_slat_width, rpi_mount_slat_thick], center=true);
+            translate([-rpi_case_to_bar-frontPlateThickness, 0, 0]/2)
+                cube([rpi_case_to_bar,frontPlateThickness,frontPlateWidth], center=true);
+        }
     
+    // Alternate fancy integrated mount arm
     module rpi_mount(){
+        mount_plate_width = rpi_screw_mount_r*2;
+        bar_to_hole_center = rpi_case_to_bar + rpi_case_mount_center_to_case_bottom;
         difference(){
             union(){
-                cube([mount_plate_height,mount_plate_width,frontPlateThickness], center=true);
-                translate([mount_plate_height-case_to_bar-frontPlateThickness,0,frontPlateWidth-frontPlateThickness]/2)
-                    cube([case_to_bar+frontPlateThickness,frontPlateThickness,frontPlateWidth], center=true);
-                translate([mount_plate_height/2-frontPlateThickness-case_to_bar-hole_to_end,0,frontPlateThickness/2])
-                    cylinder(frontPlateThickness*2,screw_mount_r, screw_mount_r, center=true);
+                // Vertical riser for the screw holes
+                translate([-bar_to_hole_center/2,0,0])
+                    cube([bar_to_hole_center,mount_plate_width,frontPlateThickness], center=true);
+                
+                // Supports for the underside of the Pi
+                translate([-rpi_case_to_bar, -frontPlateThickness+mount_plate_width, frontPlateWidth-frontPlateThickness]/2)
+                    cube([rpi_case_to_bar,frontPlateThickness,frontPlateWidth], center=true);
+                translate([-rpi_case_to_bar,frontPlateThickness-mount_plate_width,frontPlateWidth-frontPlateThickness]/2)
+                    cube([rpi_case_to_bar,frontPlateThickness,frontPlateWidth], center=true);
+                
+                // Thicker potion for the actual screwholes
+                hull() {for (i = [-1,1])
+                    translate([-bar_to_hole_center - i*rpi_case_hole_to_hole/2,0,frontPlateThickness/2])
+                        cylinder(frontPlateThickness*2,rpi_screw_mount_r, rpi_screw_mount_r, center=true);
+                }
             }
-            translate([mount_plate_height/2-frontPlateThickness-case_to_bar-hole_to_end,0,-frontPlateThickness*1.5+1])
-                //metric_thread (diameter=2.0, pitch=0.45, length=frontPlateThickness*2.5, internal=false); // M2 x .45
-                english_thread (diameter=0.086, threads_per_inch=56, length=frontPlateThickness*2.5/25.4, internal=false); // 2-56
+            
+            // Screw holes
+            for (i = [-1,1])
+                translate([-bar_to_hole_center - i*rpi_case_hole_to_hole/2, 0, -frontPlateThickness*1.5+1])
+                    //metric_thread (diameter=2.0, pitch=0.45, length=frontPlateThickness*2.5, internal=true); // M2 x .45
+                    //english_thread (diameter=0.086*1.05, threads_per_inch=56, length=frontPlateThickness*2.5/25.4, internal=true); // 2-56
+                    english_thread (diameter=0.1120, threads_per_inch=40, length=frontPlateThickness*2.5/25.4, internal=true); // 4-40
         }
     }
+    //translate([-frontPlateThickness,-rpi_case_side_offset,-frontPlateWidth+frontPlateThickness]/2) rpi_mount();
     
-    rotate([180,0,0])frontBeam();
-    translate([-mount_plate_height+frontPlateThickness,-case_side_offset,-frontPlateWidth+frontPlateThickness]/2) union(){
-        translate([0, hole_to_hole/2,0]) rpi_mount();
-        translate([0,-hole_to_hole/2,0]) rpi_mount();
-    }
-    
-    
+    // 
     
 }
+*frontBeam_With_RPi_Mount();
+
+module RPi_adaptor(){
+    wall_t = 1.6;
+    slat_hole_w = rpi_mount_slat_width+innermargin*2;
+    slat_hole_t = rpi_mount_slat_thick+innermargin*2;
+    mount_w = rpi_mount_slat_half_distance*2 + slat_hole_w + wall_t*2;
+    mount_t = slat_hole_t + wall_t*2;
+    mount_h = rpi_case_mount_center_to_case_bottom + rpi_case_hole_to_hole/2 + rpi_screw_mount_r;
+    
+    nut_r = 7/2+innermargin; // radius of a superscribed circle, aka corner-to-corner distance
+    nut_t = 2.4;
+    
+    difference(){
+        translate([-mount_h/2,0,0]) cube([mount_h,mount_w,mount_t], center=true);
+        
+        for (i = [-1,1])
+        translate([0,i*rpi_mount_slat_half_distance,0]) cube([mount_h*3,slat_hole_w,slat_hole_t], center=true);
+        
+        
+        
+        // Screw holes
+        for (i = [-1,1])
+            translate([-rpi_case_mount_center_to_case_bottom - i*rpi_case_hole_to_hole/2, 0,0])union(){
+                translate([0,0, mount_t-nut_t+0.01]/2) cylinder(nut_t, nut_r, nut_r, $fn=6, center=true);
+                //metric_thread (diameter=2.0, pitch=0.45, length=frontPlateThickness*2.5, internal=true); // M2 x .45
+                //english_thread (diameter=0.086*1.05, threads_per_inch=56, length=frontPlateThickness*2.5/25.4, internal=true); // 2-56
+                //translate([0,0, -mount_t*1.2/2])english_thread (diameter=0.1120, threads_per_inch=40, length=mount_t*1.2/25.4, internal=true); // 4-40
+                cylinder(mount_t*1.2,1.6,1.6, center=true); // Open hole that should fit a 4-40 or M3 bolt
+            }
+    }
+    
+}
+*RPi_adaptor();
 
 
   ///////////
@@ -598,7 +660,7 @@ module speedControlMount(peg_offset_1, peg_offset_2, hole_radius){
     scm_thickness = 2;
     scm_mount_depth = 6;
     scm_length =  frame_wing_outerwidth + scm_thickness*2;
-    scm_clip_margin = 0.2;
+    scm_clip_margin = -0.1;
     
     cube([scm_thickness, scm_length, peg_radius*2], center=true);
     
@@ -624,7 +686,7 @@ module wireManagementClip(batteryWidth = 0, batteryAnchorHeight = 0){
     thickness = 2;
     scm_mount_depth = 6;
     length =  max(batteryWidth, frame_backbone_outerwidth) + thickness*2;
-    scm_clip_margin = 0.2;
+    scm_clip_margin = -0.1;
     
     cube([thickness, length, thickness], center=true);
     
@@ -659,14 +721,14 @@ speedControlMount(arduino_hole_offset_b1, arduino_hole_offset_b2, arduino_hole_r
 wireManagementClip(); // Print at least 4
 
 wireManagementClip(14, 30); // Phone battery pack (print 2)
-wireManagementClip(27, 20); // LiFe Battery (print 2)
+!wireManagementClip(27, 20); // LiFe Battery (print 2)
 
 
 rotate([180,0,0])motorGrip(length = 16.5+tire_width); // Print 4
 frontBeam(); // Print 1
-!frontBeam_With_RPi_Mount(); // Print 1
+frontBeam_With_RPi_Mount(); // Print 1
 wheel_printable(); // Print 4
 rotate([0,90,0]) wheel_gripper_setscrew(); // Print 4 (suggested layer thickness: 0.1mm)
 wheel_bushing(); // Print 4
 frame(); // Print 1
-
+!RPi_adaptor(); // Print 1
