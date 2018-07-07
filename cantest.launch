@@ -1,0 +1,13 @@
+<launch>
+	<rosparam command="load" file="$(find tycho)/tycho_params.yml" />
+	
+	<node name="cantest" pkg="tycho" type="canard_test.py" output="screen"  />
+	
+	<node name="joy_node" pkg="joy" type="joy_node" respawn="true" />
+	
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py"  >
+	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
+	</node>
+	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
+	
+</launch>

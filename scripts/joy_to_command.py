@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+import time
 #import std_msgs.msg
 from sensor_msgs.msg import Joy
 from tycho.msg import RoverDriveCommand
@@ -8,7 +9,6 @@ from math import atan2, sqrt, pi
 # Author: Andrew Dai
 # This ROS Node converts Joystick inputs from the joy node
 # into commands for turtlesim
-
 
 class JoyToCommand:
     def __init__(self):
@@ -42,7 +42,7 @@ class JoyToCommand:
 	self.joyState['modeNeutral'] = 0
         self.joyState['stopButton'] = 0
         self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand, queue_size=1)
-
+       
     # Receives joystick messages (subscribed to Joy topic)
     # then converts the joysick inputs into Twist commands
     # axis 1 aka left stick vertical controls linear speed
@@ -51,6 +51,7 @@ class JoyToCommand:
         """
         
         """
+        
         def updateValueIfNeeded(key, isAxis=False):
             if isAxis:
                 newdata = data.axes[ self.buttonMap[key] ]
@@ -83,7 +84,6 @@ class JoyToCommand:
     
     # TODO: Why don't wheels return forward after leaving turnInPlace?
     def interpretJoystick(self):
-	
         if self.joyState['modeSideways'] == 1:
 	    print('sending to interpretStrafe()')
 	    self.interpretStrafe()
@@ -104,7 +104,6 @@ class JoyToCommand:
 	    self.isStrafing = True
 	    print('sending to interpretNormal()')
 	    self.interpretNormal()
-
         return
         
 	
@@ -143,7 +142,8 @@ class JoyToCommand:
     #
 
     def interpretNormal(self):
-	print('reached interpretNormal()')
+    	t0 = time.time()
+	# print('reached interpretNormal()')
         speed = self.joyState['joyYAxis']
         strafeAngle=0
         turnX = 0
@@ -179,7 +179,7 @@ class JoyToCommand:
     #
     
     def interpretStrafe(self):
-	print('reached interpretStrafe()')
+	# print('reached interpretStrafe()')
         speed = sqrt(self.joyState['joyXAxis']**2 + self.joyState['joyYAxis']**2)
         if self.joyState['joyYAxis'] < 0: speed = abs(self.joyState['joyXAxis'])
         
@@ -208,7 +208,7 @@ class JoyToCommand:
     #
     
     def interpretTurnInPlace(self):
-	print('reached interpretTurnInPlace()')
+	# print('reached interpretTurnInPlace()')
 	speed = self.joyState['joyXAxis']
 	
         isBraking = (self.joyState['joyYAxis'] <= -0.75)
@@ -216,7 +216,7 @@ class JoyToCommand:
     #
 
     def interpretCircleStrafe(self):
-	print('reached interpretCircleStrafe()')
+	# print('reached interpretCircleStrafe()')
 	speed = self.joyState['joyXAxis']
 	
 	isBraking = (self.joyState['joyYAxis'] <= -0.75)
@@ -262,6 +262,7 @@ def start():
     # starts the node
     rospy.init_node('Joy2Tycho')
     rospy.spin()
+
 #
 
 if __name__ == '__main__':

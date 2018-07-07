@@ -46,6 +46,11 @@ class CommandToAngles:
                        'BackLeft':  0.635, 'BackRight':  -0.635};
         self.steeringArmLength = 0.365; # Pivot to center of tire
         
+        # System to rate-limit messages
+        self.hasNewMessage = False
+        self.lastMessageTime = rospy.Time(0)
+        self.messageInterval = 0.05 # s
+        
         self.pub = rospy.Publisher('tycho/low_level_motor_values', WheelAnglesSpeeds, queue_size=1)
     #
     
@@ -216,17 +221,28 @@ class CommandToAngles:
         for i in ['FrontLeft','FrontRight','BackLeft','BackRight']:
             print("%s, %.2f, %.2f"%(i, self.wheelAngles[i], self.wheelSpeeds[i]))
         
-        m = WheelAnglesSpeeds()
-        m.header.stamp = rospy.Time.now()
-        m.front_left_angle  = self.wheelAngles['FrontLeft']
-        m.front_left_speed  = self.wheelSpeeds['FrontLeft']
-        m.front_right_angle = self.wheelAngles['FrontRight']
-        m.front_right_speed = self.wheelSpeeds['FrontRight']
-        m.back_left_angle   = self.wheelAngles['BackLeft']
-        m.back_left_speed   = self.wheelSpeeds['BackLeft']
-        m.back_right_angle  = self.wheelAngles['BackRight']
-        m.back_right_speed  = self.wheelSpeeds['BackRight']
-        self.pub.publish(m)
+        self.m = WheelAnglesSpeeds()
+        self.m.header.stamp = rospy.Time.now()
+        self.m.front_left_angle  = self.wheelAngles['FrontLeft']
+        self.m.front_left_speed  = self.wheelSpeeds['FrontLeft']
+        self.m.front_right_angle = self.wheelAngles['FrontRight']
+        self.m.front_right_speed = self.wheelSpeeds['FrontRight']
+        self.m.back_left_angle   = self.wheelAngles['BackLeft']
+        self.m.back_left_speed   = self.wheelSpeeds['BackLeft']
+        self.m.back_right_angle  = self.wheelAngles['BackRight']
+        self.m.back_right_speed  = self.wheelSpeeds['BackRight']
+        self.hasNewMessage = True
+        self.publishMessage()
+        #self.pub.publish(self.m)
+    #
+    
+    # Rate-limited message publication
+    def publishMessage(self):
+        if (not self.hasNewMessage) or (rospy.Time.now() - self.lastMessageTime).to_sec() < self.messageInterval:
+            return
+        self.pub.publish(self.m)
+        self.lastMessageTime = rospy.Time.now()
+        self.hasNewMessage = False
     #
     
 
@@ -236,7 +252,14 @@ def start():
     
     # starts the node
     rospy.init_node('Model2Raw')
-    rospy.spin()
+    
+    # Try to flush the message buffer every 1ms
+    rate = rospy.Rate(1000) # Hz
+    while not rospy.is_shutdown():
+        rate.sleep()
+        interpreter.publishMessage()
+    #
+    #rospy.spin()
 #
 
 if __name__ == '__main__':

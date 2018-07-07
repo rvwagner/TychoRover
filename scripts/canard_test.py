@@ -25,6 +25,10 @@ print "Executing serial SKITP protocol on %s"%port
 ser = serial.Serial(port, 9600, timeout=1)
 ser.write(b'\r')
 ser.close()
+ser = serial.Serial(port, 9600, timeout=1)
+ser.write(b'\r')
+ser.close()
+print("Done")
 
 # TODO: Organize this in an appropriate place
 PacketTypes = Enum('PacketTypes', 'TPDO heartbeat other')
@@ -95,7 +99,7 @@ class TychoCANable:
     
     # Frame ID is 0x200/300/400/500 + node ID
     header = (0x100 + 0x100*index)|dest
-    #print("Building frame %03X : %d, %d"%(header, int1, int2))
+    if header == 0x201: print("Building frame 0x%03X : %d, %d"%(header, int1, int2))
     frame = can.Frame(header)
     frame.dlc = 8
     frame.data = [
@@ -129,7 +133,12 @@ class TychoCANable:
   #
   
   def sendFrame(self, frame):
+    #print("Sending frame "+str(frame))
     return self.dev.send(frame)
+  #
+  
+  def queueFrame(self, frame):
+    self.frame=frame
   #
   
   def receiveFrame(self):
@@ -140,6 +149,10 @@ class TychoCANable:
     frame=self.receiveFrame()
     frameType = self.getPacketType(frame)
     return frame, frameType
+  #
+  
+  def stop(self):
+    return self.dev.stop()
   #
 # END CLASS
 
@@ -157,6 +170,7 @@ speedMultiplier = 100
 angleMultiplier = 10
 
 def new_command_callback(data):
+    #print("Recieved command: %.2f m/s at %.1f deg"%(data.back_left_speed, data.back_left_angle))
     canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(frontRightID, 1, round(data.front_right_speed * speedMultiplier), round( data.front_right_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(backLeftID, 1, round(data.back_left_speed * speedMultiplier), round(data.back_left_angle * angleMultiplier)))
@@ -165,12 +179,13 @@ def new_command_callback(data):
 
 # starts the node
 
+print("Subscribing to topic")
 # Subscribe to low-level commands topic
 rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback)
     
 # Publish topic with current wheel sensor statuses
 # TODO: Maybe break this up into a couple of topics?
-statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus)
+statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus, queue_size=10)
 
 # starts the node
 rospy.init_node('CAN_Handler')
@@ -222,8 +237,17 @@ frame = canable.buildRawCommand(1, 0x200, 8, [0x00,0x00,0x00,0x00,0x00,0x00,0x00
 canable.sendFrame(frame)
 print(frame)
 
+canable.sendFrame(canable.buildRPDO(frontLeftID, 1, 0, 0))
+canable.sendFrame(canable.buildRPDO(frontRightID, 1, 0, 0))
+canable.sendFrame(canable.buildRPDO(backLeftID, 1, 0, 0))
+canable.sendFrame(canable.buildRPDO(backRightID, 1, 0, 0))
+
+# TODO: Add bootup frames
+print("Frame sent")
+
 count = 0
-while True:
+rate = rospy.Rate(100) # Hz
+while not rospy.is_shutdown():
   f, packet_type = canable.receiveFrameWithType()
   if packet_type == PacketTypes.TPDO:
     index, node, data1, data2 = canable.readTPDO(f)
@@ -237,11 +261,13 @@ while True:
     #elif count > 100:
     #  dev.send(estop_frame)
   elif packet_type == PacketTypes.heartbeat:
-    pass
+    print("Ba-dump")
   else: # Unknwon packet type
-    print "%03X"%f.id, f.data
+    pass
+    #print "%03X"%f.id, f.data
+  rate.sleep()
 #
 
 
-dev.stop()
+canable.stop()
 
