@@ -1,0 +1,23 @@
+<launch>
+	<rosparam command="load" file="$(find tycho)/tycho_params.yml" />
+	
+	<!-- FAKED - Joystick input - FAKED -->
+	<node name="joy_node" pkg="tycho" type="fake_joystick.py" respawn="true" />
+	
+	<!-- Convert joystick to high-level commands -->
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" output="screen" >
+	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
+	</node>
+	
+	<!-- Convert high-level commands to wheel angles/speeds -->
+	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
+	
+	<!-- FAKED - Send wheel angles/speeds to motor controllers over CAN bus, and handle returned sensor values - FAKED -->
+	<node name="fake_CAN" pkg="tycho" type="fake_wheel_status.py" respawn="true" />
+	
+	<!-- TODO: Add reader for 9DOF IMU -->
+	
+	
+	<!-- Use returned sensor values to establish a dead-reckoning position -->
+	<node name="dead_reckoner" pkg="tycho" type="dead_reckoning_position.py" respawn="true" />
+</launch>
