@@ -54,6 +54,7 @@ add_message_files(
   WheelStatus.msg
   RoverPosition.msg
   DisplayPanel.msg
+  Mouse.msg
 )
 
 ## Generate services in the 'srv' folder
