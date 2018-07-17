@@ -4,7 +4,7 @@
  *  Handles interactions with the joystick and buttons on the control panel, and
  *  publishes three ROS topics:
  *  
- *  joy/joy (sensor_msgs/Joy):
+ * tycho/joy (sensor_msgs/Joy):
  *    Standard joystick topic for the joystick and drive mode buttons
  *  tycho/gui_page (std_msgs/Int16):
  *    Integer indicating which page of the GUI to display
@@ -49,7 +49,7 @@ joy_msg.buttons_length=6;
 
 
 ros::Publisher<std_msgs::Int16> pagePub("tycho/gui_page");
-ros::Publisher<sensor_msgs::Joy> joyPub("joy/joy");
+ros::Publisher<sensor_msgs::Joy> joyPub("tycho/joy");
 //ros::Publisher<tycho::Mouse> joyPub("tycho/mouse");
 #endif
 

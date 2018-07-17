@@ -1,11 +1,47 @@
 <launch>
 	<rosparam command="load" file="$(find tycho)/tycho_params.yml" />
-	<node name="joy_node" pkg="joy" type="joy_node" respawn="true" />
 	
-	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" output="screen" >
+	<!-- ------ -->
+	<!-- Inputs -->
+	<!-- ------ -->
+
+	<!-- Joystick input -->
+	<node name="joy_node" pkg="joy" type="joy_node" respawn="true" >
+	    <remap from="joy" to="tycho/joy" />
+	</node>
+	<!-- <node name="serial_bridge_joystick" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" /> -->
+	
+	<!-- Current Sensor Arduino -->
+	<!-- <node name="serial_bridge_power" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB1" /> -->
+	
+	<!-- TODO: Add reader for 9DOF IMU -->
+	
+	
+	<!-- ---------------- -->
+	<!-- Command Pipeline -->
+	<!-- ---------------- -->
+	
+	<!-- Convert joystick to high-level commands -->
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" >
 	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
 	</node>
+	
+	<!-- Convert high-level commands to wheel angles/speeds -->
 	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
 	
-	<node name="serial_bridge" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" />
+	<!-- Send wheel angles/speeds to motor controllers over CAN bus, and handle returned sensor values -->
+	<node name="canard_node" pkg="tycho" type="canard_test.py" output="screen" />
+	
+	
+	<!-- ----------------------- -->
+	<!-- Sensors/Logging/Display -->
+	<!-- ----------------------- -->
+	
+	<!-- Use returned sensor values to establish a dead-reckoning position -->
+	<node name="dead_reckoner" pkg="tycho" type="dead_reckoning_position.py" respawn="true" />
+	
+	
+	
+	<!-- Mini-Tycho Arduino -->
+	<!-- <node name="serial_bridge_hood_ornament" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB2" /> -->
 </launch>

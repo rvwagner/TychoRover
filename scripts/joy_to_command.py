@@ -12,7 +12,7 @@ from math import atan2, sqrt, pi
 
 class JoyToCommand:
     def __init__(self):
-        rospy.Subscriber("joy", Joy, self.callback, queue_size=1)
+        rospy.Subscriber("tycho/joy", Joy, self.callback, queue_size=1)
         
         # Extra dead zone for transition from straight ahead to full strafe
         # In this dead zone, speed=0 and angle is a linear transition from
