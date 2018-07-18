@@ -69,7 +69,6 @@ class TychoCANable:
     frame.data=data
     return frame
   #
-  #estop_frame = buildRawCommand(1, 0x600, 8, [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00])
   
   def getSpecialCommand(self, dest, commandType):
     try:
@@ -115,6 +114,28 @@ class TychoCANable:
     return frame
   #
   
+  
+  def buildSetVariable(self, dest, var_id, data):
+    # TODO: Check for overflow when fixing inputs
+    if not isinstance(int1, int): int1 = int(round(int1))
+    if not isinstance(int2, int): int2 = int(round(int2))
+    
+    # Frame ID is 0x600 + node ID
+    header = (0x600)|dest
+    frame = can.Frame(header)
+    frame.dlc = 8
+    frame.data = [
+      0x20,            # Type = Command (2), no unused bytes
+      0x05, 0x20,      # Set User Integer Variable
+      var_id    &0xFF, # Variable index
+       data     &0xFF, # Data (4 bytes)
+      (data>>8) &0xFF,
+      (data>>16)&0xFF,
+      (data>>24)&0xFF,
+    ]
+    return frame
+  #
+  
   # Take frame, returns TPDO ID, source node ID, and both integer values
   # TPDO ID will be 0 if the packet is not a TPDO
   def readTPDO(self, frame):
@@ -131,6 +152,13 @@ class TychoCANable:
     
     return index, source, data1, data2
   #
+  
+  def readHeartbeat(self, frame):
+    return frame.id & 0x07F # Node ID is 7 bits
+  #
+  
+  
+  
   
   def sendFrame(self, frame):
     #print("Sending frame "+str(frame))
@@ -159,7 +187,27 @@ class TychoCANable:
 
 
 
+def updatePID(p,i,d):
+    # Trying broadcast frames
+    canable.sendFrame(canable.buildSetVariable(0, 18, p))
+    canable.sendFrame(canable.buildSetVariable(0, 19, i))
+    canable.sendFrame(canable.buildSetVariable(0, 20, d))
+    canable.sendFrame(canable.buildSetVariable(0, 21, 1)) # Alert the controller to the change
+#
 
+def sendHeartbeat(event):
+    # Trying broadcast frames
+    # TODO: Change the 400 to read MC_Speed_Scale from ROS params file
+    canable.sendFrame(canable.buildRPDO(0, 4, 400, 1))
+#
+
+def sendESTOP():
+    canable.sendFrame(canable.buildRawCommand(0, 0x600, 8, [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]))
+#
+
+def clearESTOP(node):
+    canable.sendFrame(canable.buildRawCommand(node, 0x600, 8, [0x2C,0x0D,0x20,0x00,0x01,0x00,0x00,0x00]))
+#
 
 
 frontLeftID  = 1
@@ -195,6 +243,7 @@ ready_to_send = [0x0,0x0,0x0,0x0,0x0]
 wheel_statuses = [0, WheelStatus(), WheelStatus(), WheelStatus(), WheelStatus()]
 for i in (1,2,3,4): wheel_statuses[i].wheel_id = i
 
+# TODO: Scale these values
 def handleTPDO(index, node, data1, data2):
 	if index == 1: # TPDO1: RMP 1, Amps 1
 		wheel_statuses[node].drive_rpm = data1
@@ -230,7 +279,7 @@ def handleTPDO(index, node, data1, data2):
 
 canable = TychoCANable(port=port)
 
-
+# Trying broadcast
 
 print "Sending initial frame"
 frame = canable.buildRawCommand(1, 0x200, 8, [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
@@ -245,26 +294,41 @@ canable.sendFrame(canable.buildRPDO(backRightID, 1, 0, 0))
 # TODO: Add bootup frames
 print("Frame sent")
 
+
+
+# Set up heartbeat timer- will fire every 200ms
+# http://wiki.ros.org/rospy/Overview/Time#Timer
+heartbeat_timer = rospy.Timer(rospy.Duration(0.2), sendHeartbeat)
+now = rospy.get_rostime()
+lastHeartbeat = [0, now, now, now, now]
+maxHeartbeatDelay = rospy.Duration(0.5) # Delay until a controller is declared lost
+
 count = 0
 rate = rospy.Rate(100) # Hz
 while not rospy.is_shutdown():
+  now = rospy.get_rostime()
+  
   f, packet_type = canable.receiveFrameWithType()
   if packet_type == PacketTypes.TPDO:
     index, node, data1, data2 = canable.readTPDO(f)
     handleTPDO(index, node, data1, data2)
- #   print "TPDO%d: %d, %d"%(index, data1, data2)
- #   count += 1
- #   if count % 10 == 0:
- #     frame = canable.buildRPDO(1,1,data2+1, 0)
- #     print(frame)
- #     canable.sendFrame(frame)
-    #elif count > 100:
-    #  dev.send(estop_frame)
   elif packet_type == PacketTypes.heartbeat:
-    print("Ba-dump")
+    node = canable.readHeartbeat(f)
+    lastHeartbeat[node] = now
   else: # Unknwon packet type
     pass
     #print "%03X"%f.id, f.data
+  #
+  
+  # Check heartbeats
+  for i in (1,2,3,4):
+    if now - lastHeartbeat[i] > maxHeartbeatDelay:
+      # TODO: Send estop if a controller is lost!
+      rospy.logwarn("Lost controller %d!", i)
+      # sendESTOP()
+    #
+  #
+  
   rate.sleep()
 #
 

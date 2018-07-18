@@ -1,5 +1,5 @@
 ' Advanced CAN test
-' confirmed 20180629
+' Untested
 
 ' NOTE: All #defines must come before any line of code
 #define STEER_BRAKE_PIN 2
@@ -19,10 +19,23 @@
 ' CAN input variables
 #define COMMANDED_SPEED_VAR 9
 #define COMMANDED_ANGLE_VAR 10
+#define SPEED_SCALE_FACTOR_INPUT_VAR 11
+#define MASTER_IS_ALIVE_VAR 12
+
+#define PID_P 18
+#define PID_I 19
+#define PID_D 20
+#define NEW_PID 21
+
 
 #define DATA_SEND_RATE 200
+#define WATCHDOG_TIMEOUT 500
 #define REPORT_TIMER 1
-SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+#define WATCHDOG_TIMER 2
+
+
+
+
 
 
 SetConfig(_CAS, 1)       ' Autostart CANopen on boot (does not work?)
@@ -45,6 +58,14 @@ SetConfig(_CHB,     DATA_SEND_RATE) ' Send heartbeat every X ms
 ' there is apparently a CANOpen "start" command?
 
 Current_Drive_Speed = 0
+
+' Wait for confirmation that CAN bus is running
+GoSub SafeUntilSignal
+
+' TODO: Once master heartbeat starts, load any master-supplied parameters from RPDOs
+
+' Start timer to watch for 
+SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
 
 
 '''''''''''''
@@ -87,11 +108,31 @@ top:
         x = 0
     End If
 	
+
+
+    ' Check for PID updates:
+    If getvalue(_VAR, NEW_PID) = 1 Then
+        SetCommand(_ESTOP, 1)
+   '   setconfig(_KP, STEER_CHANNEL, getvalue(_VAR, PID_P))
+   '   setconfig(_KI, STEER_CHANNEL, getvalue(_VAR, PID_I))
+   '   setconfig(_KD, STEER_CHANNEL, getvalue(_VAR, PID_D))
+        SetCommand(_VAR, NEW_PID, 0)
+    End If
+
     ' Set report variables
     If GetTimerState(REPORT_TIMER) = 1 Then
         GoSub ReportParameters
         SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
     End If
+    
+    ' Check for master heartbeat
+    If getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 1 Then
+        SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+        SetCommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+    ElseIf GetTimerState(WATCHDOG_TIMER) = 1 Then
+        SetCommand(_ESTOP, 1)
+    End If
+    
     wait(10)
 GoTo top
 
@@ -110,14 +151,43 @@ Return
 
 
 ' Parameter-reporting subroutine
-ReportParametersReal:
+ReportParametersFake:
     setcommand(_VAR, 1,  Final_Drive_Speed) ' getValue(_ABSPEED, 2) ) '[motor rpm 1])
     'setcommand(_VAR, 2,  getValue(_MOTAMPS, DRIVE_CHANNEL) ) '[motor amps 1])
     setcommand(_VAR, 3,  getValue(_FEEDBK, DRIVE_CHANNEL) ) '[motor (incremental) step count 1])
 	' TODO: Reset feedback count?
-    setcommand(_VAR, 4,  Current_Steering_Speed) 'getValue(_TEMP, 1) )'[MCU Temp])
+    setcommand(_VAR, 4,  Current_Steering_Speed) 'getValue(_TEMP, 1) ) '[MCU Temp])
     setcommand(_VAR, 5,  Current_Steering_Angle) '[motor angle 2])
     setcommand(_VAR, 6,  commanded_angle_scaled) 'getValue(_MOTAMPS, 2) )'[motor amps 2]) ' Could totally combine the amps as 16-bit ints
     setcommand(_VAR, 7,  getValue(_AI, 1) )'[Motor1 Temp]) ' Could probably combine these temps as 16-bit unsigned ints
     setcommand(_VAR, 8,  getValue(_AI, 2) )'[Motor2 Temp])
+Return
+
+
+' safe-until-signal subroutine
+SafeUntilSignal:
+    ' Clear the flag that set by the NUC's "heartbeat" RPDO
+    setcommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+    
+    ' Stop motors
+    setcommand(_MSTOP, DRIVE_CHANNEL) ' "Stop in all modes"
+    setcommand(_MSTOP, STEER_CHANNEL)
+    
+    ' Wait until both are stopped before signaling brakes
+    While GetConfig(_S, STEER_CHANNEL) <> 0 ' Steering speed (will probably hit 0 first)
+        wait(1)
+    End While
+    SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+    
+    While GetConfig(_S, DRIVE_CHANNEL) <> 0 ' Driving speed
+        wait(1)
+    End While
+    SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+    
+    ' Wait for a signal
+    While getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 0
+        wait(1)
+    End While
+    
+    SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
 Return
