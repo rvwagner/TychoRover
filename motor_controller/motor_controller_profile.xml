@@ -6,7 +6,7 @@
         <Nodes>
           <Node Text="Scripting">
             <Nodes>
-              <Node Text="Script Auto-Start" Value="0">
+              <Node Text="Script Auto-Start" Value="1">
                 <Nodes />
               </Node>
             </Nodes>
@@ -94,7 +94,7 @@
       </Node>
       <Node Text="CAN">
         <Nodes>
-          <Node Text="CAN Mode" Value="0">
+          <Node Text="CAN Mode" Value="1">
             <Nodes />
           </Node>
           <Node Text="Bit Rate" Value="3">
@@ -106,7 +106,7 @@
           <Node Text="Listen Node ID" Value="4">
             <Nodes />
           </Node>
-          <Node Text="Heartbeat (ms)" Value="0">
+          <Node Text="Heartbeat (ms)" Value="2000">
             <Nodes />
           </Node>
           <Node Text="MiniCAN Send Rate (ms)" Value="100">
@@ -114,21 +114,21 @@
           </Node>
           <Node Text="CANOpen TPDO Send Rate">
             <Nodes>
-              <Node Text="TPDO 1 Send Rate (ms)" Value="0">
+              <Node Text="TPDO 1 Send Rate (ms)" Value="200">
                 <Nodes />
               </Node>
-              <Node Text="TPDO 2 Send Rate (ms)" Value="0">
+              <Node Text="TPDO 2 Send Rate (ms)" Value="200">
                 <Nodes />
               </Node>
-              <Node Text="TPDO 3 Send Rate (ms)" Value="0">
+              <Node Text="TPDO 3 Send Rate (ms)" Value="200">
                 <Nodes />
               </Node>
-              <Node Text="TPDO 4 Send Rate (ms)" Value="0">
+              <Node Text="TPDO 4 Send Rate (ms)" Value="200">
                 <Nodes />
               </Node>
             </Nodes>
           </Node>
-          <Node Text="CANOpen Autostart" Value="0">
+          <Node Text="CANOpen Autostart" Value="1">
             <Nodes />
           </Node>
         </Nodes>
@@ -143,10 +143,10 @@
               <Node Text="Pulses/Rev" Value="5000">
                 <Nodes />
               </Node>
-              <Node Text="Min Limit" Value="-4000">
+              <Node Text="Min Limit" Value="-10000">
                 <Nodes />
               </Node>
-              <Node Text="Max Limit" Value="4000">
+              <Node Text="Max Limit" Value="10000">
                 <Nodes />
               </Node>
               <Node Text="Home Count" Value="0">
@@ -753,7 +753,7 @@
               <Node Text="Amps Limit (A)" Value="250">
                 <Nodes />
               </Node>
-              <Node Text="Amps Trigger (A)" Value="1500">
+              <Node Text="Amps Trigger (A)" Value="200">
                 <Nodes />
               </Node>
               <Node Text="Amps Trigger Delay (ms)" Value="500">
@@ -834,7 +834,7 @@
               <Node Text="Amps Limit (A)" Value="500">
                 <Nodes />
               </Node>
-              <Node Text="Amps Trigger (A)" Value="1500">
+              <Node Text="Amps Trigger (A)" Value="200">
                 <Nodes />
               </Node>
               <Node Text="Amps Trigger Delay (ms)" Value="500">
@@ -876,7 +876,7 @@
               <Node Text="Position Mode Velocity (RPM)" Value="1000">
                 <Nodes />
               </Node>
-              <Node Text="Position Turns Min to Max" Value="2000">
+              <Node Text="Position Turns Min to Max" Value="4000">
                 <Nodes />
               </Node>
               <Node Text="Proportional Gain" Value="40">
