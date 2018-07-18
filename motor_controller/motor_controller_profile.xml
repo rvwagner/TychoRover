@@ -214,7 +214,7 @@
               <Node Text="Active Level" Value="0">
                 <Nodes />
               </Node>
-              <Node Text="Action" Value="0">
+              <Node Text="Action" Value="36">
                 <Nodes />
               </Node>
             </Nodes>
@@ -234,7 +234,7 @@
               <Node Text="Active Level" Value="0">
                 <Nodes />
               </Node>
-              <Node Text="Action" Value="0">
+              <Node Text="Action" Value="37">
                 <Nodes />
               </Node>
             </Nodes>
@@ -360,7 +360,7 @@
           </Node>
           <Node Text="AIn4" Value="">
             <Nodes>
-              <Node Text="Conversion Type" Value="0">
+              <Node Text="Conversion Type" Value="1">
                 <Nodes />
               </Node>
               <Node Text="Input Use" Value="0">
@@ -753,7 +753,7 @@
               <Node Text="Amps Limit (A)" Value="250">
                 <Nodes />
               </Node>
-              <Node Text="Amps Trigger (A)" Value="200">
+              <Node Text="Amps Trigger (A)" Value="1500">
                 <Nodes />
               </Node>
               <Node Text="Amps Trigger Delay (ms)" Value="500">
@@ -834,7 +834,7 @@
               <Node Text="Amps Limit (A)" Value="500">
                 <Nodes />
               </Node>
-              <Node Text="Amps Trigger (A)" Value="200">
+              <Node Text="Amps Trigger (A)" Value="1500">
                 <Nodes />
               </Node>
               <Node Text="Amps Trigger Delay (ms)" Value="500">
@@ -873,19 +873,19 @@
           </Node>
           <Node Text="Closed Loop Parameters">
             <Nodes>
-              <Node Text="Position Mode Velocity (RPM)" Value="500">
+              <Node Text="Position Mode Velocity (RPM)" Value="1000">
                 <Nodes />
               </Node>
-              <Node Text="Position Turns Min to Max" Value="1000">
+              <Node Text="Position Turns Min to Max" Value="2000">
                 <Nodes />
               </Node>
-              <Node Text="Proportional Gain" Value="100">
+              <Node Text="Proportional Gain" Value="40">
                 <Nodes />
               </Node>
-              <Node Text="Integral Gain" Value="10">
+              <Node Text="Integral Gain" Value="1">
                 <Nodes />
               </Node>
-              <Node Text="Differential Gain" Value="0">
+              <Node Text="Differential Gain" Value="180">
                 <Nodes />
               </Node>
               <Node Text="Integrator Limit (%)" Value="100">
