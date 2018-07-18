@@ -248,10 +248,11 @@ class CommandToAngles:
 
 # Intializes everything
 def start():
-    interpreter = CommandToAngles() # subscribes to joystick inputs on topic "joy"
-    
     # starts the node
     rospy.init_node('Model2Raw')
+    
+    # subscribes to joystick inputs on topic "joy", creates publisher
+    interpreter = CommandToAngles() 
     
     # Try to flush the message buffer every 1ms
     rate = rospy.Rate(1000) # Hz

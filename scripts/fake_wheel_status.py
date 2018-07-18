@@ -109,10 +109,11 @@ class MakeFakeWheelStatus:
 
 # Intializes everything
 def start():
-    interpreter = MakeFakeWheelStatus() # subscribes to low-level commands
-    
     # starts the node
     rospy.init_node('Raw2FakeStatus')
+    
+    interpreter = MakeFakeWheelStatus() # subscribes to low-level commands
+    
     rospy.spin()
 #
 

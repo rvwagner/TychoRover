@@ -87,10 +87,11 @@ class DeadReckoning:
 
 # Intializes everything
 def start():
-    interpreter = DeadReckoning()
-    
     # starts the node
     rospy.init_node('DeadReckoning')
+    
+    interpreter = DeadReckoning()
+    
     rospy.spin()
 #
 

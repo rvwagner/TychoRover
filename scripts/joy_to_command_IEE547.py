@@ -161,12 +161,13 @@ class JoyToCommand:
 
 # Intializes everything
 def start():
+    rospy.init_node('Joy2Tycho')
+    
     # publishing to "turtle1/cmd_vel" to control turtle1
     global pub
     interpreter = JoyToCommand() # subscribes to joystick inputs on topic "joy"
     
     # starts the node
-    rospy.init_node('Joy2Tycho')
     rospy.spin()
 #
 
