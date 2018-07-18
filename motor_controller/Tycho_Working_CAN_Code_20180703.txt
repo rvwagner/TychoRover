@@ -1,0 +1,68 @@
+' Dead simple CAN test
+' confirmed 20180703 on a clean boot
+
+#define STEER_BRAKE_PIN 1
+#define DRIVE_BRAKE_PIN 2
+#define BRAKES_ON _D0
+#define BRAKES_OFF _D1
+
+Speed_Scale_Factor = 400
+
+SetConfig(_CAS, 1)       ' Autostart CANopen on boot (does not work?)
+SetConfig(_CEN, 2)       ' Start miniCAN 
+' FIXME: This is a dirty hack, I think I actually need an activation packet on the CAN BUS
+SetConfig(_CEN, 1)       ' Start CANopen
+SetConfig(_CTPS, 1, 200) ' Send VAR1,2 every 200 ms
+SetConfig(_CTPS, 2, 200) ' Send VAR3,4 every 200 ms
+SetConfig(_CTPS, 3, 200) ' Send VAR5,6 every 200 ms
+SetConfig(_CTPS, 4, 200) ' Send VAR7,8 every 200 ms
+SetConfig(_CHB, 2000)    ' Send heartbeat every 2s
+x = 1
+' The following get/set commands are from some RoboTeq example code
+top:
+    ' RPDOs are now being recieved properly
+    in1 = getvalue(_VAR, 9)
+    in2 = getvalue(_VAR, 10)
+    in3 = getvalue(_VAR, 11)
+    in4 = getvalue(_VAR, 12)
+    in5 = getvalue(_VAR, 13)
+    in6 = getvalue(_VAR, 14)
+    in7 = getvalue(_VAR, 15)
+    in8 = getvalue(_VAR, 16)
+	'Current_Steering_Speed = GetValue(_S, 2)
+	'Current_Steering_Angle = GetValue(_F, 2)
+	'If in1 = 0 Then
+    '    SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+    'Else
+    '    SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)
+    '    ' SetValue(_G, 2, Final_Angle)
+    'End If
+    out1 = in1 + 3
+    out2 = in2 * 2
+    out3 = in3 + 3
+    out4 = in4 * 2
+    out5 = in5 + 3
+    out6 = in6 * 2
+    out7 = in7 + 3
+    out8 = in7 * 2
+    ' setcommand(_VAR, 1, out1)
+    ' 
+	'setcommand(_VAR, Current_Steering_Speed, out2)
+    'print("spd = ", Current_Steering_Speed, ", ", Current_Steering_Angle, "\n")
+	'
+	x = x + 1
+	If x > 1000 Then
+        x = 0
+	End If
+	' TPDOs are working perfectly
+    SetCommand(_VAR, 1, out1)
+    SetCommand(_VAR, 2, out2)
+    SetCommand(_VAR, 3, x)
+    SetCommand(_VAR, 4, out3+1)
+    SetCommand(_VAR, 5, out4+2)
+    SetCommand(_VAR, 6, out5+2)
+    SetCommand(_VAR, 7, out6+3)
+    SetCommand(_VAR, 8, out7+3)
+	
+    wait(10)
+GoTo top

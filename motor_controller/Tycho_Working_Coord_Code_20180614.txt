@@ -1,0 +1,38 @@
+' Dead simple CAN test
+'SetConfig(_CEN, 1)       ' Start CANopen
+'SetConfig(_CTPS, 1, 200) ' Send VAR1,2 every 200 ms
+'SetConfig(_CHB, 100) ' Send heartbeat every 100ms
+
+
+' drive motor max speed is ~34.3 RPM at 1000 power
+
+#define COMMANDED_SPEED_VAR 9
+#define COMMANDED_ANGLE_VAR 10
+
+#define STEER_BRAKE_PIN 1
+#define DRIVE_BRAKE_PIN 2
+#define BRAKES_ON _D0
+#define BRAKES_OFF _D1
+
+#define DATA_SEND_RATE 200
+#define REPORT_TIMER 1
+SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+
+Speed_Scale_Factor = 400
+base_speed = 0
+Current_Drive_Speed = 0
+
+begin:
+
+
+' tends to lose tracking at low speeds
+
+    Current_Steering_Speed = GetValue(_ABSPEED, 1) ' Should be in RPM
+    Current_Steering_Angle = GetValue(_F, 1)*9/5 ' Reports value from -1000 to +1000, so this is tenthdegrees
+
+    Final_Drive_Speed = 0 - Current_Steering_Speed * Speed_Scale_Factor / 100
+
+    SetCommand(_G, 1, Final_Drive_Speed)
+
+GoTo begin
+
