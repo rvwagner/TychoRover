@@ -1,0 +1,123 @@
+' Advanced CAN test
+' confirmed 20180629
+
+' NOTE: All #defines must come before any line of code
+#define STEER_BRAKE_PIN 2
+#define DRIVE_BRAKE_PIN 1
+#define BRAKES_ON _D0
+#define BRAKES_OFF _D1
+#define DRIVE_CHANNEL 1
+#define STEER_CHANNEL 2
+
+' empirically derived
+#define SPEED_SCALE_FACTOR 400
+
+'''''''''''''
+' CAN SETUP '
+'''''''''''''
+
+' CAN input variables
+#define COMMANDED_SPEED_VAR 9
+#define COMMANDED_ANGLE_VAR 10
+
+#define DATA_SEND_RATE 200
+#define REPORT_TIMER 1
+SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+
+
+SetConfig(_CAS, 1)       ' Autostart CANopen on boot (does not work?)
+SetConfig(_CEN, 2)       ' Start miniCAN 
+wait(10)
+' FIXME: This is a dirty hack, I think I actually need an activation packet on the CAN BUS
+SetConfig(_CEN, 1)       ' Start CANopen
+SetConfig(_CTPS, 1, DATA_SEND_RATE) ' Send VAR1,2 every X ms
+SetConfig(_CTPS, 2, DATA_SEND_RATE) ' Send VAR3,4 every X ms
+SetConfig(_CTPS, 3, DATA_SEND_RATE) ' Send VAR5,6 every X ms
+SetConfig(_CTPS, 4, DATA_SEND_RATE) ' Send VAR7,8 every X ms
+SetConfig(_CHB,     DATA_SEND_RATE) ' Send heartbeat every X ms
+
+''''''''''''''''''''''''''''
+' INITIALIZE COMMUNICATION '
+''''''''''''''''''''''''''''
+
+' INSERT BOOTUP CODE HERE
+
+' there is apparently a CANOpen "start" command?
+
+Current_Drive_Speed = 0
+
+
+'''''''''''''
+' MAIN LOOP '
+'''''''''''''
+
+x = 1
+' The following get/set commands are from some RoboTeq example code
+top:
+    ' RPDOs are now being recieved properly
+    commanded_speed = getvalue(_VAR, COMMANDED_SPEED_VAR)
+    commanded_angle = getvalue(_VAR, COMMANDED_ANGLE_VAR)
+    commanded_angle_scaled = commanded_angle * 10 / 9 ' from tenthdegrees to +/-1000
+    
+    'commanded_speed = 0
+
+    ' tends to lose tracking at low speeds
+    Current_Steering_Speed = GetValue(_ABSPEED, 1) ' Should be in RPM (*10?)
+    Current_Steering_Angle = GetValue(_F, 1)*9/5   ' Reports value from -1000 to +1000, so this is tenthdegrees
+
+    Final_Drive_Speed = commanded_speed - Current_Steering_Speed * SPEED_SCALE_FACTOR / 100
+    
+	If Final_Drive_Speed < 10 Then
+        SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+    Else 
+        SetCommand(BRAKES_OFF, DRIVE_BRAKE_PIN)
+    End If
+    SetCommand(_G, 1, Final_Drive_Speed)
+    
+    If commanded_angle = Current_Steering_Angle Then
+        SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+    Else 
+        SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)
+    End If
+    SetCommand(_G, STEER_CHANNEL, commanded_angle_scaled)
+
+    ' Basic counter to make sure things are looping
+    x = x + 1
+    If x > 1000 Then
+        x = 0
+    End If
+	
+    ' Set report variables
+    If GetTimerState(REPORT_TIMER) = 1 Then
+        GoSub ReportParameters
+        SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+    End If
+    wait(10)
+GoTo top
+
+
+' Parameter-reporting subroutine
+ReportParameters:
+    SetCommand(_VAR, 1, commanded_speed)
+    SetCommand(_VAR, 2, commanded_angle)
+    SetCommand(_VAR, 3, x)
+    SetCommand(_VAR, 4, commanded_angle_scaled)
+    SetCommand(_VAR, 5, Current_Steering_Speed)
+    SetCommand(_VAR, 6, Current_Steering_Angle)
+    SetCommand(_VAR, 7, Final_Drive_Speed)
+    SetCommand(_VAR, 8, x)
+Return
+
+
+' Parameter-reporting subroutine
+ReportParametersReal:
+    setcommand(_VAR, 1,  Final_Drive_Speed) ' getValue(_ABSPEED, 2) ) '[motor rpm 1])
+    'setcommand(_VAR, 2,  getValue(_MOTAMPS, DRIVE_CHANNEL) ) '[motor amps 1])
+    setcommand(_VAR, 3,  getValue(_FEEDBK, DRIVE_CHANNEL) ) '[motor (incremental) step count 1])
+	' TODO: Reset feedback count?
+    setcommand(_VAR, 4,  Current_Steering_Speed) 'getValue(_TEMP, 1) )'[MCU Temp])
+    setcommand(_VAR, 5,  Current_Steering_Angle) '[motor angle 2])
+    setcommand(_VAR, 6,  commanded_angle_scaled) 'getValue(_MOTAMPS, 2) )'[motor amps 2]) ' Could totally combine the amps as 16-bit ints
+    setcommand(_VAR, 7,  getValue(_AI, 1) )'[Motor1 Temp]) ' Could probably combine these temps as 16-bit unsigned ints
+    setcommand(_VAR, 8,  getValue(_AI, 2) )'[Motor2 Temp])
+Return
