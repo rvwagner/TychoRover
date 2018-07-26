@@ -41,7 +41,7 @@ public:
 
   void init(){
     for (int i =0; i < count; i++){
-      pinMode(sigpin_arr[i], INPUT);
+      pinMode(sigpin_arr[i], INPUT_PULLUP);
       pinMode(lightpin_arr[i], OUTPUT);
     }
     updateLights();
@@ -50,7 +50,7 @@ public:
   bool checkForButtonChange(){
     bool hasChanged = false;
     for (int i = count-1; i >= 0; i--){ // Run loop in reverse to go from lowest priority to highest
-      if (i != active_button && digitalRead(lightpin_arr[i]) == HIGH){
+      if (i != active_button && digitalRead(lightpin_arr[i]) == LOW){
         active_button = i;
         hasChanged = true;
       }
@@ -94,7 +94,7 @@ public:
   }
   
   void init(){
-    pinMode(signal_pin, INPUT);
+    pinMode(signal_pin, INPUT_PULLUP);
     pinMode(light_pin, OUTPUT);
     updateLight();
   }
@@ -102,10 +102,10 @@ public:
   bool checkForButtonChange(){
     bool hasChanged = false;
     int pinVal = digitalRead(signal_pin);
-    if      (state == off      && pinVal == HIGH) {state = presson;  hasChanged = true;}
-    else if (state == presson  && pinVal == LOW)  {state = on;}
-    else if (state == on       && pinVal == HIGH) {state = pressoff; hasChanged = true;}
-    else if (state == pressoff && pinVal == LOW)  {state = off;}
+    if      (state == off      && pinVal == LOW) {state = presson;  hasChanged = true;}
+    else if (state == presson  && pinVal == HIGH)  {state = on;}
+    else if (state == on       && pinVal == LOW) {state = pressoff; hasChanged = true;}
+    else if (state == pressoff && pinVal == HIGH)  {state = off;}
     if (hasChanged) updateLight();
     return hasChanged;
   }
@@ -138,7 +138,7 @@ public:
   }
   
   void init(){
-    pinMode(signal_pin, INPUT);
+    pinMode(signal_pin, INPUT_PULLUP);
     pinMode(light_pin, OUTPUT);
   }
 
@@ -154,7 +154,7 @@ public:
   }
 
   bool read() {
-    if (state == HIGH) return true;
+    if (state == LOW) return true;
     else return false;
   }
   
