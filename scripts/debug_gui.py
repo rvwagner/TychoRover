@@ -11,10 +11,10 @@ speed = [2, 2]
 black = 0, 0, 0
 screen = pygame.display.set_mode(size)
 
-background = pygame.image.load("/home/ubuntu/Desktop/tycho/resources/TychoHUD_Background.png")
+background = pygame.image.load("/home/pi/Desktop/Link to tycho/resources/TychoHUD_Background.png")
 
 # Order: FL, FR, BL, BR
-wheel_base = pygame.image.load("/home/ubuntu/Desktop/tycho/resources/TychoHUD_WheelFLBR.png")
+wheel_base = pygame.image.load("/home/pi/Desktop/Link to tycho/resources/TychoHUD_WheelFLBR.png")
 wheel_images = [
 	pygame.transform.flip(wheel_base,True,True),
 	pygame.transform.flip(wheel_base,False,True),

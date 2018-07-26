@@ -295,7 +295,6 @@ canable.sendFrame(canable.buildRPDO(backRightID, 1, 0, 0))
 print("Frame sent")
 
 
-
 # Set up heartbeat timer- will fire every 200ms
 # http://wiki.ros.org/rospy/Overview/Time#Timer
 heartbeat_timer = rospy.Timer(rospy.Duration(0.2), sendHeartbeat)
@@ -308,6 +307,9 @@ rate = rospy.Rate(100) # Hz
 while not rospy.is_shutdown():
   now = rospy.get_rostime()
   
+count = 0
+rate = rospy.Rate(100) # Hz
+while not rospy.is_shutdown():
   f, packet_type = canable.receiveFrameWithType()
   if packet_type == PacketTypes.TPDO:
     index, node, data1, data2 = canable.readTPDO(f)
@@ -328,7 +330,6 @@ while not rospy.is_shutdown():
       # sendESTOP()
     #
   #
-  
   rate.sleep()
 #
 

@@ -251,9 +251,12 @@ def start():
     # starts the node
     rospy.init_node('Model2Raw')
     
+<<<<<<< Updated upstream
     # subscribes to joystick inputs on topic "joy", creates publisher
     interpreter = CommandToAngles() 
     
+=======
+>>>>>>> Stashed changes
     # Try to flush the message buffer every 1ms
     rate = rospy.Rate(1000) # Hz
     while not rospy.is_shutdown():

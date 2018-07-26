@@ -4,13 +4,13 @@
 	    <remap from="joy" to="tycho/joy" />
 	</node>
 	
-	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" >
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" output="screen" >
 	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
 	</node>
 	<node name="highlevel2lowlevel" pkg="tycho" type="command_to_angles.py" />
 	
 	<!-- <node name="dead_reckoning"    pkg="tycho" type="dead_reckoning_position.py" /> --> <!-- Semi-fake pose data -->
-	<node name="fake_wheel_status" pkg="tycho" type="fake_wheel_status.py" output="screen" />  
+	<node name="fake_wheel_status" pkg="tycho" type="fake_wheel_status.py" />  
 	<!-- Mostly-fake wheel information -->
 	<node name="sensors2display"   pkg="tycho" type="coallate_display_panel.py" />  <!-- Display panel message generator -->
 	

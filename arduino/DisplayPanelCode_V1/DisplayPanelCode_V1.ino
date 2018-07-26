@@ -24,9 +24,6 @@
 #include <SparkFunLSM9DS1.h>
 #include "LedControl.h"
 
-//Create LSM9DS1 object
-LSM9DS1 imu;
-
 #define ROS
 
 #define LSM9DS1_M    0x1E
@@ -42,17 +39,22 @@ LSM9DS1 imu;
 ros::NodeHandle nh;
 #endif
 
+
+
+// Accelerometer object
+LSM9DS1 imu;
+
 //Pins: DIN,CLK,CS, # of displays connected
 LedControl lc = LedControl(30,33,31,1);
 
-// Assign each warning motor a pin.
+// Warning servo motor declerations.
 const int temp_warning = 3; //Motor 1
 const int slope_warning = 5; //Motor 2
 const int speed_warning = 7; //Motor 3
 const int batt_warning = 9; // Motor 4
 const int brakes_engaged = 11; // Motor 5
 
-// Assign each display a pin.
+// 7 Segment display declerations.
 const int speedPin = 32;
 const int pitchPin = 34;
 const int rollPin = 35;
@@ -84,9 +86,6 @@ Servo servos[4];
 void rosSetDisplayValues(const tycho::DisplayPanel& values){
   
   displayValue(speedPin, values.speed);
-  displayValue(pitchPin, retPitch(imu.ax, imu.ay, imu.az));
-  displayValue(rollPin, retRoll(imu.ay, imu.az));
-  displayValue(headingPin, retHeading(-imu.my, -imu.mx));
   displayValue(tempPin, values.max_drive_temp);
   
     /* Handle warning flags on arduino?
@@ -129,12 +128,267 @@ ros::Subscriber<tycho::DisplayPanel> displaySub("tycho/display_values", &rosSetD
 
 #endif
 
+//////////////////////////
+// Display 7 Seg Values //
+//////////////////////////
+void displayValue(int pinNumber, float dispValue)
+{
+    clearDisplaySPI(pinNumber);
+    
+    int floatInInt;
+    
+    setDecimalsSPI();
+    
+    floatInInt = (int)(dispValue * 10); 
+
+    sprintf(tempString, "%4d", floatInInt);
+    segStringSPI(pinNumber, tempString);
+    
+    setDecimalsSPI();
+  
+}
+
+//////////////////////////////
+// Define LED Matrix Angles //
+//////////////////////////////
+byte degree0[] =
+{
+  B00000010,
+  B00000010,
+  B00000010
+};
+
+byte degree45[] =
+{
+  B00000001,
+  B00000010,
+  B00000100
+};
+
+byte degree_neg45[] =
+{
+  B00000100,
+  B00000010,
+  B00000001
+};
+
+byte degree90[] =
+{
+  B00000000,
+  B00000111,
+  B00000000
+};
+
+//////////////////////////////////
+// Display Angles on LED Matrix //
+//////////////////////////////////
+void display_angles(float front_left_angle, float front_right_angle, float back_left_angle, float back_right_angle) {
+ 
+  delay(100);
+ byte fullDisplay[] =
+{
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000,
+  B00000000
+};
+
+  ///////////////
+  // Top Right //
+  ///////////////
+  for(int i = 0; i < 3; i++)
+  {
+    fullDisplay[i] = fullDisplay[i] | wheelAngle(front_right_angle)[i];
+  } 
+  
+  //////////////////
+  // Bottom Right //
+  //////////////////
+  for(int i = 0; i < 3; i++)
+  {
+    fullDisplay[i+5] = fullDisplay[i+5] | wheelAngle(back_right_angle)[i]; 
+  }
+  
+  //////////////
+  // Top Left //
+  //////////////
+  for(int i = 0; i < 3; i++)
+  {
+    fullDisplay[i] = fullDisplay[i] | wheelAngle(front_left_angle)[i] << 5;
+  }
+  
+  /////////////////
+  // Bottom Left //
+  /////////////////
+  for (int i = 0; i < 3; i++)
+  {
+    fullDisplay[i+5] = fullDisplay[i+5] | wheelAngle(back_left_angle)[i] << 5; 
+  } 
+  
+  // Write to display
+  for(int i = 0; i < 8; i++){
+    lc.setRow(0, i, fullDisplay[i]); 
+  }
+}
+
+// Return current angle of wheels 
+byte* wheelAngle(float angle)
+{
+  if((angle >= 0 && angle < 30) || (angle < 0 && angle > -30))  
+  {
+    return degree0; 
+  }
+  else if(angle >= 30 && angle < 75)
+  {
+    return degree45; 
+  }
+  else if(angle <= -30 && angle > -75) 
+  {
+    return degree_neg45;
+  }
+  else if(angle > -90 && angle <= -135)
+  {
+    return degree_neg45;
+  }
+  else if(angle >= 75 && angle <= 90 || (angle <= -75 && angle >= -90))
+  {
+    return degree90;
+  } 
+}
+
+//////////////////////
+// Helper Functions //
+//////////////////////
+
+// Read accelerometer values
+void updateAccVals()
+{
+  imu.readMag();
+  imu.readAccel(); 
+  delay(500);
+}
+
+float tempRoll = 0.0;
+// Return roll values.
+float retRoll(float ay, float az)
+{
+  roll = atan2(ay, az);
+  roll *= 180.0/PI;
+  
+  if(roll < tempRoll - 0.5 || roll > tempRoll + 0.5) 
+  {
+    tempRoll = roll;
+    return roll;
+  }
+  
+  return tempRoll; 
+}
+
+float tempPitch = 0.0;
+// Return pitch values.
+float retPitch(float ax, float ay, float az)
+{
+  pitch = atan2(-ax, sqrt(ay * ay + az * az));
+  pitch *= 180.0/PI;
+  
+  if(pitch < tempPitch - 0.5 || pitch > tempPitch + 0.5)
+  {
+    tempPitch = pitch;
+    return pitch;
+  }
+  
+  return tempPitch;
+}
+
+// Return heading values.
+float retHeading(float my, float mx)
+{
+  if(my == 0)
+    heading = (mx < 0) ? 180.0 : 0;
+  else
+    heading = atan2(mx, my);
+    
+  heading -= DECLINATION * PI/180;
+  
+  if(heading > PI) heading -= (2*PI);
+  
+  else if (heading < -PI) heading += (2 * PI);
+  
+  else if (heading < 0) heading += 2 * PI;
+  
+  //Convert from radians to degrees
+  heading *= 180.0 / PI;
+  
+  Serial.print("Heading: " ); 
+  Serial.println(heading);
+  
+  return heading;
+} 
+
+// Print array of chars to 7 Seg Display 
+void segStringSPI(const int pin, String toSend)
+{
+  digitalWrite(pin, LOW);
+  
+  for(int i = 0; i < 4; i++)
+  {
+     SPI.transfer(toSend[i]); 
+  }
+  digitalWrite(pin, HIGH);
+}
+
+// Clear all displays.
+void clearDisplaySPI(int pin)
+{
+  digitalWrite(pin, LOW);
+  SPI.transfer(0x76);
+  digitalWrite(pin, HIGH);
+  
+}
+
+// Set brightness of all 7 Segment displays
+void setBrightnessSPI(byte value)
+{
+  digitalWrite(speedPin, LOW);
+  digitalWrite(pitchPin, LOW);
+  digitalWrite(rollPin, LOW);
+  digitalWrite(headingPin, LOW);
+  digitalWrite(tempPin, LOW); 
+  SPI.transfer(0x7A);  // Set brightness command byte
+  SPI.transfer(value); // Brightness data byte
+  digitalWrite(speedPin, HIGH);
+  digitalWrite(pitchPin, HIGH);
+  digitalWrite(rollPin, HIGH);
+  digitalWrite(headingPin, HIGH);
+  digitalWrite(tempPin, HIGH);
+}
+
+// Set decimal position on 7 segment displays
+void setDecimalsSPI()
+{
+  digitalWrite(speedPin, LOW);
+  digitalWrite(pitchPin, LOW);
+  digitalWrite(rollPin, LOW);
+  digitalWrite(headingPin, LOW);
+  digitalWrite(tempPin, LOW);
+  SPI.transfer(0x77); // Set decimal command byte
+  SPI.transfer(0b00000100);// Set to 1 decimal place
+  digitalWrite(speedPin, HIGH);
+  digitalWrite(pitchPin, HIGH);
+  digitalWrite(rollPin, HIGH);
+  digitalWrite(headingPin, HIGH);
+  digitalWrite(tempPin, HIGH);
+}
+
 ////////////////////
 // Setup and Loop //
 ////////////////////
 void setup()
 {
-  
   //Configure LSM9DS1
   imu.settings.device.commInterface = IMU_MODE_I2C;
   imu.settings.device.mAddress = LSM9DS1_M;
@@ -162,7 +416,7 @@ void setup()
   lc.setIntensity(0,5);
   lc.clearDisplay(0);
  
-  // --------Initialize SPI pins
+  // Initialize 7 seg display pins
   pinMode(speedPin, OUTPUT);
   pinMode(pitchPin, OUTPUT);
   pinMode(rollPin, OUTPUT);
@@ -210,236 +464,6 @@ void demoLoop()
   
   delay(200);
 }
-
-void updateAccVals()
-{
-  imu.readMag();
-  imu.readAccel(); 
-  delay(200);
-}
-
-float retRoll(float ay, float az)
-{
-  roll = atan2(ay, az);
-  roll *= 180.0/PI;
- 
-  return roll; 
-}
-
-float retPitch(float ax, float ay, float az)
-{
-  pitch = atan2(-ax, sqrt(ay * ay + az * az));
-  pitch *= 180.0/PI;
-  
-  return pitch;
-}
-
-float retHeading(float my, float mx)
-{
-  
-  if(my == 0)
-    heading = (mx < 0) ? 180.0 : 0;
-  else
-    heading = atan2(mx, my);
-    
-  heading -= DECLINATION * PI/180;
-  
-  if(heading > PI) heading -= (2*PI);
-  
-  else if (heading < -PI) heading += (2 * PI);
-  
-  else if (heading < 0) heading += 2 * PI;
-  
-  //Convert from radians to degrees
-  heading *= 180.0 / PI;
-  
-  Serial.print("Heading: " ); 
-  Serial.println(heading);
-  
-  return heading;
-} 
-///////////////////////
-// Display Functions //
-///////////////////////
-
-void displayValue(int pinNumber, float dispValue)
-{
-    clearDisplaySPI(pinNumber);
-    
-    int floatInInt;
-    
-    setDecimalsSPI();
-    
-    floatInInt = (int)(dispValue * 10); 
-
-    sprintf(tempString, "%4d", floatInInt);
-    segStringSPI(pinNumber, tempString);
-    
-    setDecimalsSPI();
-  
-}
-
-////////////////////
-// Display Angles //
-////////////////////
-byte degree0[] =
-{
-  B00000010,
-  B00000010,
-  B00000010
-};
-
-byte degree45[] =
-{
-  B00000001,
-  B00000010,
-  B00000100
-};
-
-byte degree_neg45[] =
-{
-  B00000100,
-  B00000010,
-  B00000001
-};
-
-byte degree90[] =
-{
-  B00000000,
-  B00000111,
-  B00000000
-};
-
-void display_angles(float front_left_angle, float front_right_angle, float back_left_angle, float back_right_angle) {
- 
-  delay(100);
- byte fullDisplay[] =
-{
-  B00000000,
-  B00000000,
-  B00000000,
-  B00000000,
-  B00000000,
-  B00000000,
-  B00000000,
-  B00000000
-};
-
-  //top right
-  for(int i = 0; i < 3; i++)
-  {
-    fullDisplay[i] = fullDisplay[i] | wheelAngle(front_right_angle)[i];
-  } 
-  
-  //bottom right
-  for(int i = 0; i < 3; i++)
-  {
-    fullDisplay[i+5] = fullDisplay[i+5] | wheelAngle(back_right_angle)[i]; 
-  }
-  
-  //top left
-  for(int i = 0; i < 3; i++)
-  {
-    fullDisplay[i] = fullDisplay[i] | wheelAngle(front_left_angle)[i] << 5;
-  }
-  
-  //bottom left
-  for (int i = 0; i < 3; i++)
-  {
-    fullDisplay[i+5] = fullDisplay[i+5] | wheelAngle(back_left_angle)[i] << 5; 
-  } 
-  
-  for(int i = 0; i < 8; i++){
-    lc.setRow(0, i, fullDisplay[i]); 
-  }
-}
-//////////////////////
-// Helper Functions //
-//////////////////////
-
-// Function to print array of chars
-void segStringSPI(const int pin, String toSend)
-{
-  digitalWrite(pin, LOW);
-  
-  for(int i = 0; i < 4; i++)
-  {
-     SPI.transfer(toSend[i]); 
-  }
-  digitalWrite(pin, HIGH);
-}
-
-// Function to clear all displays
-void clearDisplaySPI(int pin)
-{
-  
-  digitalWrite(pin, LOW);
-  SPI.transfer(0x76);
-  digitalWrite(pin, HIGH);
-  
-}
-
-// Function to set the brightness of displays
-void setBrightnessSPI(byte value)
-{
-  digitalWrite(speedPin, LOW);
-  digitalWrite(pitchPin, LOW);
-  digitalWrite(rollPin, LOW);
-  digitalWrite(headingPin, LOW);
-  digitalWrite(tempPin, LOW); 
-  SPI.transfer(0x7A);  // Set brightness command byte
-  SPI.transfer(value); // Brightness data byte
-  digitalWrite(speedPin, HIGH);
-  digitalWrite(pitchPin, HIGH);
-  digitalWrite(rollPin, HIGH);
-  digitalWrite(headingPin, HIGH);
-  digitalWrite(tempPin, HIGH);
-}
-
-// Function to set the decimals for the displays
-void setDecimalsSPI()
-{
-  digitalWrite(speedPin, LOW);
-  digitalWrite(pitchPin, LOW);
-  digitalWrite(rollPin, LOW);
-  digitalWrite(headingPin, LOW);
-  digitalWrite(tempPin, LOW);
-  SPI.transfer(0x77); // Set decimal command byte
-  SPI.transfer(0b00000100);// Set to 1 decimal place
-  digitalWrite(speedPin, HIGH);
-  digitalWrite(pitchPin, HIGH);
-  digitalWrite(rollPin, HIGH);
-  digitalWrite(headingPin, HIGH);
-  digitalWrite(tempPin, HIGH);
-}
-
-// Function to return wheel angles for the matrix display. 
-byte* wheelAngle(float angle)
-{
-  
-  if((angle >= 0 && angle < 30) || (angle < 0 && angle > -30))  
-  {
-    return degree0; 
-  }
-  else if(angle >= 30 && angle < 75)
-  {
-    return degree45; 
-  }
-  else if(angle <= -30 && angle > -75) 
-  {
-    return degree_neg45;
-  }
-  else if(angle > -90 && angle <= -135)
-  {
-    return degree_neg45;
-  }
-  else if(angle >= 75 && angle <= 90 || (angle <= -75 && angle >= -90))
-  {
-    return degree90;
-  } 
-}
-
-
 
 
 
