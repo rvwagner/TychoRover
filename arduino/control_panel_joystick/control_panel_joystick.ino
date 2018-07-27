@@ -29,29 +29,25 @@
 // SET UP ROS //
 ////////////////
 
-//#define ROS
-#ifdef ROS
+#define ROS
 #include <ros.h>
+#include <std_msgs/Int16.h>
 #include <sensor_msgs/Joy.h>
 ros::NodeHandle nh;
 
 std_msgs::Int16 page_msg;
+ros::Publisher pagePub("tycho/gui_page", &page_msg);
 
-sensor_msgs::Joy joy_msg;
 // joy message type has variable-length arrays that must be allocated and assigned separately
 // http://wiki.ros.org/rosserial/Overview/Messages
+sensor_msgs::Joy joy_msg;
+ros::Publisher joyPub("tycho/joy", &joy_msg);
+
 float axes[]={0,0};
-float buttons[]={0,0,0,0,0,0};
-joy_msg.axes=axes;
-joy_msg.axes_length=2;
-joy_msg.buttons=buttons;
-joy_msg.buttons_length=6;
+int32_t buttons[]={0,0,0,0,0,0};
 
-
-ros::Publisher<std_msgs::Int16> pagePub("tycho/gui_page");
-ros::Publisher<sensor_msgs::Joy> joyPub("tycho/joy");
 //ros::Publisher<tycho::Mouse> joyPub("tycho/mouse");
-#endif
+
 
 const int minSendInterval = 1000 / 50; // second number is min update rate in Hz
 
@@ -98,10 +94,8 @@ bool isMouseMode = false;
 
 
 void changeMessageDisplayPage(){
-#ifdef ROS
   page_msg.data = displayPage.getActiveButton(); 
   pagePub.publish( &page_msg );
-#endif
 //  Serial.print("New display page: ");
 //  Serial.println(displayPage.getActiveButton());
 }
@@ -109,14 +103,17 @@ void changeMessageDisplayPage(){
 
 void setup() {
   // Initiallize serial comms at 9600 bits per second.
-  Serial.begin(9600);
-
-#ifdef ROS
+  //Serial.begin(9600);
+  
+  joy_msg.axes=axes;
+  joy_msg.axes_length=2;
+  joy_msg.buttons=buttons;
+  joy_msg.buttons_length=6;
+  
   nh.initNode();
-  nh.advertise(joyPub);
   nh.advertise(pagePub);
+  nh.advertise(joyPub);
 //  nh.advertise(mousePub);
-#endif
 
   driveMode.init(stop_button_index);
   displayPage.init();
@@ -124,8 +121,40 @@ void setup() {
 }
  
 
+void waitForMaster(){
+  int idx = 0;
+  long int t = millis();
+  while(!nh.connected()){
+    nh.spinOnce();
+    delay(1);
+    
+    if(millis()-t > 100){
+      t=millis();
+      
+      for(int i=0; i<6; i++) digitalWrite(drive_mode_light_pins[i], LOW);
+      digitalWrite(drive_mode_light_pins[idx], HIGH);
+      
+      switch(idx){
+        case 0: idx=1; break;
+        case 1: idx=2; break;
+        case 2: idx=5; break;
+        case 5: idx=4; break;
+        case 4: idx=3; break;
+        case 3: idx=0; break;
+        default: idx=0; break;
+      }
+    }
+  }
+  driveMode.updateLights();
+}
+
 
 void loop(){ 
+  
+  if(!nh.connected()) waitForMaster();
+  
+  
+  
   joy.update();
   
   
@@ -136,8 +165,6 @@ void loop(){
   } else {
     drive_loop();
   }
-#ifdef ROS
   nh.spinOnce();
-#endif
 }
 
