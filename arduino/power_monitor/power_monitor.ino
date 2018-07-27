@@ -1,6 +1,13 @@
 #include "wiring_private.h"
 #include "pins_arduino.h"
 
+#include <ros.h>
+#include <tycho/PowerMonitor.h>
+ros::NodeHandle nh;
+tycho::PowerMonitor pwr_msg;
+ros::Publisher pwrPub("tycho/power_monitor", &pwr_msg);
+
+
 uint8_t analog_reference = DEFAULT;
 float refreshRate = 10; // Rate is in Hz
 float vsd[6];
@@ -11,6 +18,10 @@ void setup() {
   int vcc0 = analogReadSlow(3);
   int gnd1 = analogReadSlow(2);
 
+
+  nh.initNode();
+  nh.advertise(pwrPub);
+/*
   Serial.begin(9600);
   Serial.print("Ground-0 = ");
   Serial.println(gnd0, DEC);
@@ -18,7 +29,7 @@ void setup() {
   Serial.println(vcc0, DEC);
   Serial.print("Ground-1 = ");
   Serial.println(gnd1, DEC);
-
+*/
 }
 
 void loop() {
@@ -68,10 +79,12 @@ void loop() {
     }
     current[i] = 73.3*(vout/vcc)-36.7; // Equation from Pololu: i = 73.3A * (vout/vcc) - 36.7A
   }
-  printValues();
-  if (millis()-startTime < 1000/refreshRate)
+  sendROSMessage();
+  while (millis()-startTime < 1000/refreshRate)
   {
-    delay((1000/refreshRate)-(millis()-startTime));
+    nh.spinOnce();
+    delay(1);
+    //delay((1000/refreshRate)-(millis()-startTime));
   }
 }
 
@@ -93,6 +106,24 @@ void printValues()
      Serial.print(current[i], DEC);
      Serial.println(" Amps.");
   }
+}
+
+void sendROSMessage(){
+  pwr_msg.header.stamp = nh.now();
+  pwr_msg.battery_1_v = vsd[0];
+  pwr_msg.battery_2_v = vsd[1];
+  pwr_msg.battery_3_v = vsd[2];
+  pwr_msg.battery_4_v = vsd[3];
+  pwr_msg.panel_12v_v = vsd[5];
+  pwr_msg.panel_5v_v  = vsd[4];
+  pwr_msg.master_a        = current[2];
+  pwr_msg.front_relay_a   = current[4];
+  pwr_msg.rear_relay_a    = current[5];
+  pwr_msg.panel_display_a = current[3];
+  pwr_msg.panel_12v_a     = current[1];
+  pwr_msg.panel_5v_a      = current[0];
+  pwrPub.publish( &pwr_msg );
+
 }
 
 int analogReadSlow(uint8_t pin)

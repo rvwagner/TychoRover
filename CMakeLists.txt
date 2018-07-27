@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   rosserial_arduino
   std_msgs
+  sensor_msgs
   message_generation
   joy
 )
@@ -55,6 +56,7 @@ add_message_files(
   RoverPosition.msg
   DisplayPanel.msg
   Mouse.msg
+  PowerMonitor.msg
 )
 
 ## Generate services in the 'srv' folder
