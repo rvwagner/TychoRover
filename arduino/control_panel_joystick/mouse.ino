@@ -11,13 +11,19 @@ bool mouseDown = true;
 
 
 void sendMouseMessage(){
-  
+  mouse_msg.header.stamp = nh.now();
+  mouse_msg.x = joy.getX();
+  mouse_msg.y = joy.getY();
+  mouse_msg.mouse_down = mouseDown;
+  mousePub.publish( &mouse_msg );
+/*
   Serial.print("Joystick Position: ");
   Serial.print(joy.getX());
   Serial.print(" ");
   Serial.print(joy.getY());
   if(mouseDown) Serial.println(" (button down)");
   else Serial.println();
+*/
 }
 
 

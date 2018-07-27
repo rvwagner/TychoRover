@@ -33,6 +33,7 @@
 #include <ros.h>
 #include <std_msgs/Int16.h>
 #include <sensor_msgs/Joy.h>
+#include <tycho/Mouse.h>
 ros::NodeHandle nh;
 
 std_msgs::Int16 page_msg;
@@ -46,7 +47,9 @@ ros::Publisher joyPub("tycho/joy", &joy_msg);
 float axes[]={0,0};
 int32_t buttons[]={0,0,0,0,0,0};
 
-//ros::Publisher<tycho::Mouse> joyPub("tycho/mouse");
+
+tycho::Mouse mouse_msg;
+ros::Publisher mousePub("tycho/mouse", &mouse_msg);
 
 
 const int minSendInterval = 1000 / 50; // second number is min update rate in Hz
@@ -113,7 +116,7 @@ void setup() {
   nh.initNode();
   nh.advertise(pagePub);
   nh.advertise(joyPub);
-//  nh.advertise(mousePub);
+  nh.advertise(mousePub);
 
   driveMode.init(stop_button_index);
   displayPage.init();
