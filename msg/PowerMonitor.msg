@@ -1,0 +1,13 @@
+Header header
+float32 battery_1_v
+float32 battery_2_v
+float32 battery_3_v
+float32 battery_4_v
+float32 panel_12v_v
+float32 panel_5v_v
+float32 master_a
+float32 front_relay_a
+float32 rear_relay_a
+float32 panel_display_a
+float32 panel_12v_a
+float32 panel_5v_a
