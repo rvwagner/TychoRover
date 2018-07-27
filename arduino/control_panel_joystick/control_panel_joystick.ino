@@ -73,18 +73,18 @@ ID  Pin Mode
  On the whiteboard that button is also called "reset position", which suggests a bug in joy2command
 */
 int drive_mode_count = 6;
-int drive_mode_pins[]             = { 2, 3, 4, 5, 6, 7};
-int drive_mode_light_pins[]       = {22,23,24,25,26,27};
+int drive_mode_pins[]             = {26,27,28,29,30,31};
+int drive_mode_light_pins[]       = { 6, 7, 8, 9,10,11};
 const int drive_mode_button_ids[] = { 5, 1, 3, 4, 0, 2}; // Indices in the Joy topic buttons array
 const int stop_button_index       =                  5; // Index in the above arrays
 
-int display_page_pins[]           = {11,12,13,14};
-int display_page_light_pins[]     = {31,32,33,34};
+int display_page_pins[]           = {22,23,24,25};
+int display_page_light_pins[]     = { 2, 3, 4, 5};
 
 LatchingButtonArray driveMode = LatchingButtonArray(drive_mode_count, drive_mode_pins, drive_mode_light_pins);
 LatchingButtonArray displayPage = LatchingButtonArray(4, display_page_pins, display_page_light_pins);
 
-MomentButton mouseButton = MomentButton(8,28);
+MomentButton mouseButton = MomentButton(32,12);
 
 
 Joystick joy = Joystick(A0, A1);
@@ -102,8 +102,8 @@ void changeMessageDisplayPage(){
   page_msg.data = displayPage.getActiveButton(); 
   pagePub.publish( &page_msg );
 #endif
-  Serial.print("New display page: ");
-  Serial.println(displayPage.getActiveButton());
+//  Serial.print("New display page: ");
+//  Serial.println(displayPage.getActiveButton());
 }
 
 
@@ -118,7 +118,7 @@ void setup() {
 //  nh.advertise(mousePub);
 #endif
 
-  driveMode.init();
+  driveMode.init(stop_button_index);
   displayPage.init();
   mouseButton.init();
 }

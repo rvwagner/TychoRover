@@ -16,8 +16,9 @@ public:
     arr[idx] = val/count;
     avg += arr[idx];
     idx = (idx+1)%count;
+    if (avg < 0.0001 && avg > -0.0001) avg = 0; // This is < 1 / (1023*6)
   }
-  int read(){ return avg; }
+  float read(){ return avg; }
   
 private:
   int count;
@@ -39,18 +40,19 @@ public:
     active_button = 0;
   }
 
-  void init(){
+  void init(int starting_button=0){
     for (int i =0; i < count; i++){
       pinMode(sigpin_arr[i], INPUT_PULLUP);
       pinMode(lightpin_arr[i], OUTPUT);
     }
+    active_button = starting_button;
     updateLights();
   }
 
   bool checkForButtonChange(){
     bool hasChanged = false;
     for (int i = count-1; i >= 0; i--){ // Run loop in reverse to go from lowest priority to highest
-      if (i != active_button && digitalRead(lightpin_arr[i]) == LOW){
+      if (i != active_button && digitalRead(sigpin_arr[i]) == LOW){
         active_button = i;
         hasChanged = true;
       }
@@ -134,7 +136,7 @@ public:
   MomentButton(int sigpin, int lightpin){
     signal_pin=sigpin;
     light_pin=lightpin;
-    state = LOW;
+    state = HIGH;
   }
   
   void init(){
@@ -147,7 +149,7 @@ public:
     int pinVal = digitalRead(signal_pin);
     if (pinVal != state) {
       state = pinVal;
-      digitalWrite(light_pin, state);
+      digitalWrite(light_pin, !state);
       hasChanged = true;
     }
     return hasChanged;
@@ -169,8 +171,8 @@ private:
 // Class that implements a state machine to debounce a virtual latching button
 
 const int joy_avg_length = 6;
-const double joyXDeadLimit = 10/512.0; // Post-mapping
-const double joyYDeadLimit = 10/512.0; // Post-mapping
+const double joyXDeadLimit = 24/512.0; // Post-mapping
+const double joyYDeadLimit = 24/512.0; // Post-mapping
 
 class Joystick{
 public:
@@ -268,26 +270,27 @@ Serial.println( cal.checksum );
     joyXBuffered.append(joyX);
     joyYBuffered.append(joyY);
 
-    
+    /*
 // print the sensor value: (For Debugging)
 Serial.print("X raw value = ");
 Serial.print(joyXRaw);
 Serial.print("\t mapped value = ");
-Serial.println(joyX);
+Serial.print(joyX);
 Serial.print("\t averaged value = ");
 Serial.println(joyXBuffered.read());
 Serial.print("Y raw value = ");
 Serial.print(joyYRaw);
 Serial.print("\t mapped value = ");
-Serial.println(joyY);
+Serial.print(joyY);
 Serial.print("\t averaged value = ");
 Serial.println(joyYBuffered.read());
+*/
   }
 
-  bool getX() {
+  float getX() {
     return joyXBuffered.read();
   }
-  bool getY() {
+  float getY() {
     return joyYBuffered.read();
   }
   

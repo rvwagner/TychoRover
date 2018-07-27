@@ -11,6 +11,7 @@ void setup() {
   int vcc0 = analogReadSlow(3);
   int gnd1 = analogReadSlow(2);
 
+  Serial.begin(9600);
   Serial.print("Ground-0 = ");
   Serial.println(gnd0, DEC);
   Serial.print("Vcc-0 = ");

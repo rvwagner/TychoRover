@@ -7,6 +7,16 @@ void sendJoyMessage(){
   joy_msg.axes[1] = joy.getY();
   joyPub.publish( &joy_msg );
 #endif
+  Serial.print("Joy: ");
+  Serial.print(joy.getX());
+  Serial.print(" ");
+  Serial.print(joy.getY());
+  
+  Serial.print(" Drive: ");
+  Serial.print(driveMode.getActiveButton());
+  
+  Serial.print(" Page: ");
+  Serial.println(displayPage.getActiveButton());
 }
 void setJoyButton(int idx, int val){
 #ifdef ROS
@@ -32,7 +42,7 @@ void drive_loop() {
       changeMessageDriveMode();
       valuesChanged = true;
     }
-    if (mouseButton.checkForButtonChange()) {
+    if ( mouseButton.checkForButtonChange() && mouseButton.read()) {
       driveMode.forceButtonChange(stop_button_index);
       isMouseMode = true;
       valuesChanged = true;

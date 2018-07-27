@@ -14,8 +14,10 @@ void sendMouseMessage(){
   
   Serial.print("Joystick Position: ");
   Serial.print(joy.getX());
+  Serial.print(" ");
   Serial.print(joy.getY());
   if(mouseDown) Serial.println(" (button down)");
+  else Serial.println();
 }
 
 
@@ -55,13 +57,13 @@ void exitMouseMode(){
   Serial.println("Exiting mouse mode...");
   isMouseMode = false;
   flashingButtons = B00111111;
-  driveMode.updateLights();
+  driveMode.forceButtonChange(stop_button_index);
 }
 
 
 void calibrate_joystick(){
   // Wait for buttons to be released
-  while (digitalRead(mode_u1) == HIGH || digitalRead(mode_l1) == HIGH) {
+  while (digitalRead(mode_u1) == LOW || digitalRead(mode_l1) == LOW) {
 #ifdef ROS
    nh.spinOnce();
 #endif
@@ -69,10 +71,10 @@ void calibrate_joystick(){
     delay(1);
   }
   
-  flashingButtons = B00100100; // flash only left two buttons
+  flashingButtons = B00001001; // flash only left two buttons
   joy.clearCalibration();
   
-  while (digitalRead(mode_u1) != HIGH && digitalRead(mode_l1) != HIGH && digitalRead(mode_u3) != HIGH) {
+  while (digitalRead(mode_u1) != LOW && digitalRead(mode_l1) != LOW) {
     joy.updateCalibration();
 #ifdef ROS
    nh.spinOnce();
@@ -86,20 +88,24 @@ void calibrate_joystick(){
 }
 
 void mouse_loop(){
+  flashModeButtons();
+  
   static long lastSend = 0;
   bool valuesChanged = false;
-  int u1 = (digitalRead(mode_u1) == HIGH) ? 1 : 0;
-  int u2 = (digitalRead(mode_u2) == HIGH) ? 1 : 0;
-  int u3 = (digitalRead(mode_u3) == HIGH) ? 1 : 0;
-  int l1 = (digitalRead(mode_l1) == HIGH) ? 1 : 0;
-  int l2 = (digitalRead(mode_l2) == HIGH) ? 1 : 0;
-  int l3 = (digitalRead(mode_l3) == HIGH) ? 1 : 0;
+  int u1 = (digitalRead(mode_u1) == LOW) ? 1 : 0;
+  int u2 = (digitalRead(mode_u2) == LOW) ? 1 : 0;
+  int u3 = (digitalRead(mode_u3) == LOW) ? 1 : 0;
+  int l1 = (digitalRead(mode_l1) == LOW) ? 1 : 0;
+  int l2 = (digitalRead(mode_l2) == LOW) ? 1 : 0;
+  int l3 = (digitalRead(mode_l3) == LOW) ? 1 : 0;
   int buttonDownCount = (u1 + u2 + u3 + l1 + l2 + l3);
   
   if (buttonDownCount == 2 && u1 && l1){
     calibrate_joystick();
   } else if (buttonDownCount == 2 && u2 && l2){
+    // Deadzone adjust?
   } else if (buttonDownCount == 2 && u3 && l3){
+    // ???
   } else if (!mouseDown && buttonDownCount == 1){
     // Exactly one button: mouseclick
     valuesChanged = true;
@@ -112,12 +118,10 @@ void mouse_loop(){
 
   // Exit mouse mode if needed and if the controls are safe
   if (joy.getX() == 0 && joy.getY() == 0 && buttonDownCount == 0) {
-    if (mouseButton.checkForButtonChange()) {
+    if (mouseButton.checkForButtonChange() && !mouseButton.read()) {
       exitMouseMode();
     }
   }
-  
-  flashModeButtons();
   
   // If it's been a while or the joystick has changed, send a packet
   if (valuesChanged || (lastSend - millis()) > minSendInterval){
