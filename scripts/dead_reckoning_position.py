@@ -57,7 +57,10 @@ class DeadReckoning:
                 turn_direction = 1
             
             turn_radius = sqrt(data.turn_center_x**2 + data.turn_center_y**2)
-            turn_angle = distance_travelled / turn_radius
+            if turn_radius == 0:
+                turn_angle = 0
+            else:
+                turn_angle = distance_travelled / turn_radius
             self.heading_r = self.heading_r + turn_angle * turn_direction
             # TODO: Update position
         else:
