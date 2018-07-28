@@ -21,14 +21,15 @@ TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
 TYCHO_CSTRAFE_ADJUST_RATE = 0.1
 
+class DriveMode(Enum):
+    STOP = 0
+    NORMAL = 1
+    STRAFE = 2
+    INPLACE = 3
+    CIRCLESTRAFE = 5
+#
+
 class JoyToCommand:
-    class DriveMode(Enum):
-        STOP = 0
-        NORMAL = 1
-        STRAFE = 2
-        INPLACE = 3
-        CIRCLESTRAFE = 5
-    #
     
     def __init__(self):
         rospy.Subscriber("tycho/joy", Joy, self.callback, queue_size=1)
@@ -105,20 +106,21 @@ class JoyToCommand:
         hasChanged = False
         hasChanged = updateValueIfNeeded('joyXAxis', isAxis=True) or hasChanged
         hasChanged = updateValueIfNeeded('joyYAxis', isAxis=True) or hasChanged
-        hasChanged = updateValueIfNeeded('modeSideways') or hasChanged
-        hasChanged = updateValueIfNeeded('modeReverse') or hasChanged
-        hasChanged = updateValueIfNeeded('modeTurnInPlace') or hasChanged
-        hasChanged = updateValueIfNeeded('modeCircleStrafe') or hasChanged
+        hasChanged = updateValueIfNeeded('buttonStrafe') or hasChanged
+        hasChanged = updateValueIfNeeded('buttonNormal') or hasChanged
+        hasChanged = updateValueIfNeeded('buttonReverse') or hasChanged
+        hasChanged = updateValueIfNeeded('buttonTurnInPlace') or hasChanged
+        hasChanged = updateValueIfNeeded('buttonCircleStrafe') or hasChanged
         
         # Ignore stop button release unless joystick is neutral
-        if self.joyState['stopButton'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
-            hasChanged = updateValueIfNeeded('stopButton') or hasChanged
+        if self.joyState['buttonStop'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
+            hasChanged = updateValueIfNeeded('buttonStop') or hasChanged
         if hasChanged:
             self.updateDriveMode()
             self.interpretJoystick()
     #
     
-    def updateDriveMode():
+    def updateDriveMode(self):
         """
         Uses the current button state to set the self.steeringMode variable
         If multiple buttons are pressed, prioritizes them
@@ -140,7 +142,7 @@ class JoyToCommand:
         #
     #
     
-    def updateDriveModeButtonless():
+    def updateDriveModeButtonless(self):
         # Abortive "no-buttons" mode.
         # Normal: push stick forward
         # Strafe: Pull stick a bit back, then push to either side
@@ -206,7 +208,7 @@ class JoyToCommand:
     # Drive like a normal car
     def interpretNormal(self):
         print('Using interpretNormal()')
-        self.strafeAngle=0 = 0
+        self.strafeAngle = 0
         self.turnX = 0
         
         # Set speed
@@ -224,7 +226,7 @@ class JoyToCommand:
         #
          
         # Request brake engagement if needed
-        if self.speed == 0.0 or self.joyState['stopButton']:
+        if self.speed == 0.0 or self.joyState['buttonStop']:
             self.isBraking = True
         #
         
@@ -275,7 +277,7 @@ class JoyToCommand:
             #
         #
         
-        if speed == 0.0 or self.joyState['stopButton']:
+        if speed == 0.0 or self.joyState['buttonStop']:
             isBraking = True
         #
         
@@ -295,7 +297,7 @@ class JoyToCommand:
         speed = self.joyState['joyXAxis']
         speed = self.scaleAndLimitSpeed(-self.joyState['joyXAxis'], TYCHO_MAX_SPIN_SPEED)
         
-        if speed == 0.0 or self.joyState['stopButton']:
+        if speed == 0.0 or self.joyState['buttonStop']:
             isBraking = True
         else:
             isBraking = False
@@ -322,7 +324,7 @@ class JoyToCommand:
             self.circleStrafeDistance += dt * TYCHO_CSTRAFE_ADJUST_RATE * (self.joyState['joyYAxis']+deadzone)/(1-deadzone)
         #
         
-        if speed == 0.0 or self.joyState['stopButton']:
+        if speed == 0.0 or self.joyState['buttonStop']:
             isBraking = True
         else:
             isBraking = False
@@ -346,7 +348,7 @@ class JoyToCommand:
     def publishCommandMessage(self):
         # In case of kill switch, override all other values
         # Should never be needed
-        if self.joyState['stopButton']:
+        if self.joyState['buttonStop']:
             speed=0
             isBraking=True
         #
@@ -358,7 +360,7 @@ class JoyToCommand:
         m.strafing_angle = self.strafeAngle
         m.is_strafing    = self.isStrafing
         m.is_braking     = self.isBraking
-        print("%.2f, (%.1f,%.1f), %.0f %s %s"%(speed, turnX, turnY, strafeAngle, isStrafing, isBraking))
+        print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
         
         self.pub.publish(m)
     #
