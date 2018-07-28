@@ -19,5 +19,5 @@
 	
 	
 	<!-- Use returned sensor values to establish a dead-reckoning position -->
-	<node name="dead_reckoner" pkg="tycho" type="dead_reckoning_position.py" respawn="true" />
+	<!-- node name="dead_reckoner" pkg="tycho" type="dead_reckoning_position.py" respawn="true" -->
 </launch>
