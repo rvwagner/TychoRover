@@ -5,7 +5,7 @@ from enum import Enum
 #import std_msgs.msg
 from sensor_msgs.msg import Joy
 from tycho.msg import RoverDriveCommand
-from math import atan2, sqrt, pi
+from math import atan2, sqrt, pi, atan
 
 # Author: Robert Wagner
 # This ROS Node converts Joystick inputs from the joy node
@@ -137,13 +137,14 @@ class JoyToCommand:
         elif self.joyState['buttonTurnInPlace']:
             self.steeringMode = DriveMode.INPLACE
         elif self.joyState['buttonCircleStrafe']:
-            if self.steeringMode != DriveMode.CIRCLESTRAFE: self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
+            if self.steeringMode != DriveMode.CIRCLESTRAFE:
+                self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
             self.steeringMode = DriveMode.CIRCLESTRAFE
         else:
             self.steeringMode = DriveMode.NORMAL
         #
         
-        print("Set driving mode to %d"%self.steeringMode)
+        print("Set driving mode to %s"%self.steeringMode.name)
     #
     
     def updateDriveModeButtonless(self):
@@ -216,6 +217,7 @@ class JoyToCommand:
         print('Using interpretNormal()')
         self.strafeAngle = 0
         self.turnX = 0
+        self.isBraking = False
         
         # Set speed
         self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
@@ -261,11 +263,14 @@ class JoyToCommand:
         isBraking = False
         print ("Base speed: %.2f"%(speed) )
         
-        strafeAngle = -atan2(-self.joyState['joyXAxis'], self.joyState['joyYAxis'])*180/pi
+        if self.joyState['joyYAxis'] != 0:
+            strafeAngle = atan(-self.joyState['joyXAxis'] / self.joyState['joyYAxis'])*180/pi
+        else:
+            strafeAngle = 0
         print ("Base angle: %.2f"%(strafeAngle) )
         
         # Adjust for deadzone
-        if speed < self.strafeDeadZone: # Near deadzone, slowly shift towards sideways
+        if abs(speed) < self.strafeDeadZone: # Near deadzone, slowly shift towards sideways
         # TODO: deadzone should actually be a pair of wedges going to the sides
         # the speed shouldn't cut off at the edge of the deadzone
         #if speed < self.strafeDeadZone and abs(self.joyState['joyXAxis']) > abs(self.joyState['joyYAxis']):
@@ -275,6 +280,7 @@ class JoyToCommand:
             speed = (speed-self.strafeDeadZone) / (1-self.strafeDeadZone)
         #
         speed = self.scaleAndLimitSpeed(speed, TYCHO_MAX_STRAFE_SPEED)
+        print ("Adjusted speed: %.2f, Angle: %.2f"%(speed, strafeAngle) )
         
         # TODO If reverse mode active
         if self.joyState['joyYAxis'] < 0:
@@ -344,7 +350,7 @@ class JoyToCommand:
     #
     
     # Update all values of saved command state at once
-    def updateFullMessage(speed, turnX, turnY, strafeAngle, isStrafing, isBraking):
+    def updateFullMessage(self, speed, turnX, turnY, strafeAngle, isStrafing, isBraking):
         self.speed = speed
         self.turnX = turnX
         self.turnY = turnY
