@@ -10,6 +10,7 @@ Requires that [ROS][] be installed (tested on ROS Kinetic Kame on Ubuntu 16.04),
 - [Joy][]: `sudo apt-get install ros-kinetic-joy`
 - [ROSSerial][]: `sudo apt-get install ros-kinetic-rosserial`
 - [ROSSerial_Arduino][]: `sudo apt-get install ros-kinetic-rosserial-arduino`
+- [ROSBridge][]: `sudo apt-get install ros-kinetic-rosbridge_suite`
 
 Requires that the [Arduino][] IDE be installed: `sudo apt-get install arduino`
 
@@ -26,12 +27,22 @@ Requires that the [Arduino][] IDE be installed: `sudo apt-get install arduino`
 - (if using SocketCAN) [can-utils][]: `sudo apt install can-utils`
 - (if using SocketCAN) slcan kernel module, if not already built [instructions](https://wiki.linklayer.com/index.php/CANtact_on_Raspberry_Pi).
 
+### Firefox
+
+The GUI requires Firefox.  Unfortunately, Firefox 53 and later are broken on Raspberry Pi MATE Ubuntu.  To install, first uninstall Firefox, then download and install version 52:
+
+    sudo apt-get purge firefox
+    wget 'http://ports.ubuntu.com/pool/main/f/firefox/firefox_52.0.2+build1-0ubuntu0.12.04.1_armhf.deb'
+    sudo dpkg -i firefox_52.0.2+build1-0ubuntu0.12.04.1_armhf.deb
+    sudo apt-mark hold firefox
+
 ## Running the code
 
 There is a launch file that starts up all the required ROS nodes:
 
     roslaunch tycho tycho.launch
 
+Once the roslaunch file has finished, go to the `web/index.html` file in Firefox to view the GUI interface.
 
 ## Controls
 
@@ -55,6 +66,7 @@ Rebuilding ROS Arduino libraries:
 [Joy]: http://wiki.ros.org/joy
 [ROSSerial]: http://wiki.ros.org/rosserial
 [ROSSerial_Arduino]: http://wiki.ros.org/rosserial_arduino
+[ROSBridge]: http://wiki.ros.org/rosbridge_suite
 [Arduino]: http://arduino.cc
 [OpenSCAD]: http://www.openscad.org
 [can-utils]: https://github.com/linux-can/can-utils
