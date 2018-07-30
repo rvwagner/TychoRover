@@ -18,6 +18,8 @@ TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 3
 TYCHO_MAX_SPIN_SPEED = 1.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
+TYCHO_MINIMUM_TURN_RADIUS = 1
+
 TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
 TYCHO_CSTRAFE_ADJUST_RATE = 0.1
 
@@ -140,6 +142,8 @@ class JoyToCommand:
         else:
             self.steeringMode = DriveMode.NORMAL
         #
+        
+        print("Set driving mode to %d"%self.steeringMode)
     #
     
     def updateDriveModeButtonless(self):
@@ -147,6 +151,8 @@ class JoyToCommand:
         # Normal: push stick forward
         # Strafe: Pull stick a bit back, then push to either side
         # In-Place: Pull stick all the way back, then swing side-to-side
+        
+        # TODO: Add stop button...
         
         # Alternate option: pull a bit back is in-place, and all the way back switches to an adjustable circle-strafe mode
         self.canReverse = False
@@ -213,12 +219,13 @@ class JoyToCommand:
         
         # Set speed
         self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
+        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], TYCHO_MAX_SPEED, self.speed) )
         
         # Set steering values depending on joystick left/right axis
         if (self.joyState['joyXAxis'] != 0.0):
             # TODO: Maybe a different function? (sqrt?)
-            # TODO: Set an appropriate minimum value?  Currently 1m, kind of by accident
-            self.turnY = -1/self.joyState['joyXAxis']
+            # TODO: Set an appropriate minimum turn radius?  Currently 1m, kind of by accident
+            self.turnY = -1/self.joyState['joyXAxis'] * TYCHO_MINIMUM_TURN_RADIUS
             self.isStrafing = False
         else:
             self.turnY = 0
@@ -231,7 +238,7 @@ class JoyToCommand:
         #
         
         # Block backwards driving if reverse mode is off
-        if self.joyState['joyYAxis'] < 0 and not self.canReverse:
+        if self.speed < 0 and not self.canReverse:
             self.speed = 0.0
         #
         
@@ -250,10 +257,12 @@ class JoyToCommand:
         
         # Set speed
         speed = sqrt(self.joyState['joyXAxis']**2 + self.joyState['joyYAxis']**2)
-        speed = self.scaleAndLimitSpeed(speed, 1.0)
+        speed = self.scaleAndLimitSpeed(speed, 1.0) # TODO: Change this to limit by maximum possible value in the chosen direction?
         isBraking = False
+        print ("Base speed: %.2f"%(speed) )
         
         strafeAngle = -atan2(-self.joyState['joyXAxis'], self.joyState['joyYAxis'])*180/pi
+        print ("Base angle: %.2f"%(strafeAngle) )
         
         # Adjust for deadzone
         if speed < self.strafeDeadZone: # Near deadzone, slowly shift towards sideways
