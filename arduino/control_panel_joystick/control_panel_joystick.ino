@@ -169,5 +169,8 @@ void loop(){
     drive_loop();
   }
   nh.spinOnce();
+  
+  // delay in between reads for stability.
+  delay(5);
 }
 

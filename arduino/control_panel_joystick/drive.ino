@@ -35,6 +35,4 @@ void drive_loop() {
   }
   
   
-  // delay in between reads for stability.
-  delay(3);
 }
