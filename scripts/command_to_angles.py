@@ -49,7 +49,9 @@ class CommandToAngles:
         # System to rate-limit messages
         self.hasNewMessage = False
         self.lastMessageTime = rospy.Time(0)
-        self.messageInterval = 0.05 # s
+        self.messageInterval = 1.0/30 # second mnumber is Hz
+        
+        self.m = WheelAnglesSpeeds()
         
         self.pub = rospy.Publisher('tycho/low_level_motor_values', WheelAnglesSpeeds, queue_size=1)
     #
@@ -68,31 +70,32 @@ class CommandToAngles:
         
         if data.is_braking:
             self.speed = 0
-	    self.setVehicleSpeed(self.speed)
-	    self.createCommandMessage()
-        else:
-            self.speed = data.speed
-            self.setVehicleSpeed(self.speed)
-            self.createCommandMessage()
-            #return
+            self.setVehicleSpeed(self.speed) #!!!
+            self.createAndPublishCommandMessage() #!!!
+            return
         #
         
-        if data.is_strafing and (data.speed != self.speed or data.strafing_angle != self.strafingAngle):
+        if data.is_strafing:
+            dataIsNew = (data.speed != self.speed or data.strafing_angle != self.strafingAngle)
+        else:
+            dataIsNew = (data.speed != self.speed or data.turn_center_x != self.turnX or data.turn_center_y != self.turnY)
+        #
+        
+        self.speed = data.speed
+        
+        if dataIsNew and data.is_strafing:
+            print("Strafing, %.2f"%(data.strafing_angle) )
             self.strafingAngle = data.strafing_angle
-            #self.speed = data.speed
             self.setAnglesStrafing(data.strafing_angle)
             self.setVehicleSpeed(self.speed)
-            self.createCommandMessage()
-        #
-        
-        if not data.is_strafing and (data.speed != self.speed or data.turn_center_x != self.turnX or data.turn_center_y != self.turnY):
+            self.createAndPublishCommandMessage()
+        elif dataIsNew and not data.is_strafing:
             print("Not strafing, %.2f %.2f"%(data.turn_center_x,data.turn_center_y) )
             self.turnX = data.turn_center_x
             self.turnY = data.turn_center_y
-            #self.speed = data.speed
             self.setAnglesFromTurnCenter(data.turn_center_x, data.turn_center_y)
             self.setVehicleSpeed(self.speed)
-            self.createCommandMessage()
+            self.createAndPublishCommandMessage()
         #
         
     #
@@ -146,10 +149,10 @@ class CommandToAngles:
             distY = turnCenterY-self.jointY[i];
             distX = turnCenterX-self.jointX[i];
             angles[i] = atan(distX/distY)*180/pi+90;
-	    circlingPoint = False
-
-	    if abs(turnCenterX) > self.jointX['FrontLeft'] and abs(turnCenterY) < self.jointY['FrontLeft']:
-		circlingPoint = True
+            circlingPoint = False #!!!
+            
+            if abs(turnCenterX) > self.jointX['FrontLeft'] and abs(turnCenterY) < self.jointY['FrontLeft']:
+                circlingPoint = True #!!!
             
             # Calculate the distance to the turning point based on whether
             # steering arm points towards or away from the turn point
@@ -217,11 +220,10 @@ class CommandToAngles:
     #
     
     
-    def createCommandMessage(self):
+    def createAndPublishCommandMessage(self):
         for i in ['FrontLeft','FrontRight','BackLeft','BackRight']:
             print("%s, %.2f, %.2f"%(i, self.wheelAngles[i], self.wheelSpeeds[i]))
         
-        self.m = WheelAnglesSpeeds()
         self.m.header.stamp = rospy.Time.now()
         self.m.front_left_angle  = self.wheelAngles['FrontLeft']
         self.m.front_left_speed  = self.wheelSpeeds['FrontLeft']
@@ -238,7 +240,7 @@ class CommandToAngles:
     
     # Rate-limited message publication
     def publishMessage(self):
-        if (not self.hasNewMessage) or (rospy.Time.now() - self.lastMessageTime).to_sec() < self.messageInterval:
+        if (not self.hasNewMessage) and (rospy.Time.now() - self.lastMessageTime).to_sec() < self.messageInterval:
             return
         self.pub.publish(self.m)
         self.lastMessageTime = rospy.Time.now()
@@ -260,7 +262,6 @@ def start():
         rate.sleep()
         interpreter.publishMessage()
     #
-    #rospy.spin()
 #
 
 if __name__ == '__main__':

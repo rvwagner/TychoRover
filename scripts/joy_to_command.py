@@ -162,7 +162,7 @@ class JoyToCommand:
         # For extra credit, add a Mouse Mode button combo to activate it.
         if self.steeringMode != DriveMode.STOP and self.joyState['joyXAxis'] == 0.0 and self.joyState['joyYAxis'] == 0.0:
 # Make the "auto-off" option require a delay of a second or so...
-# rospy.Time.now() - self.lastNonZeroTime ...
+# (rospy.Time.now() - self.lastNonZeroTime).secs > 1.0 ...
             self.steeringMode = DriveMode.STOP
             return
         elif self.steeringMode == DriveMode.STOP and self.joyState['joyYAxis'] < -0.1:
@@ -237,12 +237,14 @@ class JoyToCommand:
         #
          
         # Request brake engagement if needed
-        if self.speed == 0.0 or self.joyState['buttonStop']:
-            self.isBraking = True
+        # This isn't actually good, as it will prevent steering while stopped...
+        #if self.speed == 0.0 or self.joyState['buttonStop']:
+        #    self.isBraking = True
         #
         
         # Block backwards driving if reverse mode is off
         if self.speed < 0 and not self.canReverse:
+            self.isBraking = True # Should this exist?
             self.speed = 0.0
         #
         
@@ -294,10 +296,6 @@ class JoyToCommand:
             #
         #
         
-        if speed == 0.0 or self.joyState['buttonStop']:
-            isBraking = True
-        #
-        
         # TODO: What is this fixing?
         if abs(self.joyState['joyXAxis']) < 0.05 or abs(strafeAngle > 90):
             strafeAngle = 0.0
@@ -314,10 +312,10 @@ class JoyToCommand:
         speed = self.joyState['joyXAxis']
         speed = self.scaleAndLimitSpeed(-self.joyState['joyXAxis'], TYCHO_MAX_SPIN_SPEED)
         
-        if speed == 0.0 or self.joyState['buttonStop']:
-            isBraking = True
-        else:
-            isBraking = False
+        #if speed == 0.0 or self.joyState['buttonStop']:
+        #    isBraking = True
+        #else:
+        #    isBraking = False
         #
         
         self.updateFullMessage(speed, turnX=0, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
@@ -344,12 +342,6 @@ class JoyToCommand:
         #
         if self.circleStrafeDistance <= TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE:
             self.circleStrafeDistance = TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE
-        #
-        
-        if speed == 0.0 or self.joyState['buttonStop']:
-            isBraking = True
-        else:
-            isBraking = False
         #
         
         self.updateFullMessage(speed, turnX=self.circleStrafeDistance, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
