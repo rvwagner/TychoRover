@@ -259,8 +259,8 @@ Serial.println( cal.checksum );
     int joyYRaw = analogRead(y_pin);
     
     // map the values (x values. Joystick below neutral position)
-    double joyX = -(joyXRaw-cal.x_center)/x_half_range;
-    double joyY = -(joyYRaw-cal.y_center)/y_half_range;
+    double joyX = (joyXRaw-cal.x_center)/x_half_range;
+    double joyY = (joyYRaw-cal.y_center)/y_half_range;
     
     // Zero joystick if in dead zone
     if (abs(joyX) < joyXDeadLimit) joyX = 0;
