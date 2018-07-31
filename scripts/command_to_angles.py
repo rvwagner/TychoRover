@@ -9,6 +9,7 @@ from math import atan, atan2, sqrt, pi
 class CommandToAngles:
     def __init__(self):
         rospy.Subscriber("tycho/final_commands", RoverDriveCommand, self.callback, queue_size=1)
+        self.isStrafing = True
         self.strafingAngle = 0.0
         self.turnX = 0.0
         self.turnY = 0.0
@@ -76,21 +77,23 @@ class CommandToAngles:
         #
         
         if data.is_strafing:
-            dataIsNew = (data.speed != self.speed or data.strafing_angle != self.strafingAngle)
+            dataIsNew = (data.speed != self.speed or data.strafing_angle != self.strafingAngle) or not self.isStrafing
         else:
-            dataIsNew = (data.speed != self.speed or data.turn_center_x != self.turnX or data.turn_center_y != self.turnY)
+            dataIsNew = (data.speed != self.speed or data.turn_center_x != self.turnX or data.turn_center_y != self.turnY) or self.isStrafing
         #
         
         self.speed = data.speed
         
         if dataIsNew and data.is_strafing:
             print("Strafing, %.2f"%(data.strafing_angle) )
+            self.isStrafing = True
             self.strafingAngle = data.strafing_angle
             self.setAnglesStrafing(data.strafing_angle)
             self.setVehicleSpeed(self.speed)
             self.createAndPublishCommandMessage()
         elif dataIsNew and not data.is_strafing:
             print("Not strafing, %.2f %.2f"%(data.turn_center_x,data.turn_center_y) )
+            self.isStrafing = False
             self.turnX = data.turn_center_x
             self.turnY = data.turn_center_y
             self.setAnglesFromTurnCenter(data.turn_center_x, data.turn_center_y)

@@ -318,7 +318,7 @@ class JoyToCommand:
         #    isBraking = False
         #
         
-        self.updateFullMessage(speed, turnX=0, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
+        self.updateFullMessage(speed, turnX=0, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
         self.publishCommandMessage()
     #
     
@@ -344,7 +344,7 @@ class JoyToCommand:
             self.circleStrafeDistance = TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE
         #
         
-        self.updateFullMessage(speed, turnX=self.circleStrafeDistance, turnY=0, strafeAngle=0, isStrafing=False, isBraking=isBraking);
+        self.updateFullMessage(speed, turnX=self.circleStrafeDistance, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
         self.publishCommandMessage()
     #
     
