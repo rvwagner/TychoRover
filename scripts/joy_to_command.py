@@ -21,7 +21,8 @@ TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 TYCHO_MINIMUM_TURN_RADIUS = 1
 
 TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
-TYCHO_CSTRAFE_ADJUST_RATE = 0.1
+TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE = 1.5
+TYCHO_CSTRAFE_ADJUST_RATE = 0.75
 
 class DriveMode(Enum):
     STOP = 0
@@ -44,6 +45,7 @@ class JoyToCommand:
         self.steeringMode = DriveMode.STOP
         self.canReverse = True;
         self.lastNonZeroTime = rospy.Time.now() # Used for buttonless mode updater
+        self.lastCStrafeUpdateTime = rospy.Time.now() # Used for getting the right change rate on circle-strafe mode
         self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
         
         # Internal state of the high-level command to send
@@ -266,7 +268,7 @@ class JoyToCommand:
         if self.joyState['joyYAxis'] != 0:
             strafeAngle = atan(-self.joyState['joyXAxis'] / self.joyState['joyYAxis'])*180/pi
         else:
-            strafeAngle = 0
+            strafeAngle = -90.0 * min(max(-self.strafeDeadZone, self.joyState['joyXAxis']), self.strafeDeadZone) / self.strafeDeadZone
         print ("Base angle: %.2f"%(strafeAngle) )
         
         # Adjust for deadzone
@@ -330,13 +332,18 @@ class JoyToCommand:
         
         # Adjust circle-strafing distance using forward-backward joystick position
         # (with a big deadzone!)
-        # FIXME: Need a time delta component!
-        dt = 1.0
+        time = rospy.Time.now() 
+        dt = (time - self.lastCStrafeUpdateTime).to_sec()
+        self.lastCStrafeUpdateTime = time
+        
         deadzone = 0.5
         if self.joyState['joyYAxis'] > deadzone:
             self.circleStrafeDistance += dt * TYCHO_CSTRAFE_ADJUST_RATE * (self.joyState['joyYAxis']-deadzone)/(1-deadzone)
-        if self.joyState['joyYAxis'] < -deadzone and self.circleStrafeDistance >= 1.0:
+        if self.joyState['joyYAxis'] < -deadzone and self.circleStrafeDistance >= TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE:
             self.circleStrafeDistance += dt * TYCHO_CSTRAFE_ADJUST_RATE * (self.joyState['joyYAxis']+deadzone)/(1-deadzone)
+        #
+        if self.circleStrafeDistance <= TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE:
+            self.circleStrafeDistance = TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE
         #
         
         if speed == 0.0 or self.joyState['buttonStop']:
