@@ -14,6 +14,7 @@
 	
 	<!-- FAKED - Send wheel angles/speeds to motor controllers over CAN bus, and handle returned sensor values - FAKED -->
 	<node name="fake_CAN" pkg="tycho" type="fake_wheel_status.py" respawn="true" />
+	<node name="fake_power" pkg="tycho" type="fake_power_monitor.py" respawn="true" />
 	
 	<!-- TODO: Add reader for 9DOF IMU -->
 	
