@@ -104,10 +104,9 @@ WHO_AM_I_M_RSP		= 0x3D
 # The LSM9DS1 functions over both I2C or SPI. This library supports both.
 # But the interface mode used must be sent to the LSM9DS1 constructor. Use
 # one of these two as the first parameter of the constructor.
-class interface_mode(Enum):
-    IMU_MODE_SPI = 0
-    IMU_MODE_I2C = 1
-#
+IMU_MODE_SPI = 0
+IMU_MODE_I2C = 1
+
 
 # accel_scale defines all possible FSR's of the accelerometer:
 class accel_scale(Enum):
@@ -229,12 +228,12 @@ class pp_od(Enum):
     INT_OPEN_DRAIN = 1
 #
 
-class fifoMode_type(Enum):
-    FIFO_OFF          = 0
-    FIFO_THS          = 1
-    FIFO_CONT_TRIGGER = 3
-    FIFO_OFF_TRIGGER  = 4
-    FIFO_CONT         = 5
+#class fifoMode_type(Enum):
+FIFO_OFF          = 0
+FIFO_THS          = 1
+FIFO_CONT_TRIGGER = 3
+FIFO_OFF_TRIGGER  = 4
+FIFO_CONT         = 5
 #
 
 
@@ -289,7 +288,7 @@ class AccelSettingsStruct:
     # Accelerometer settings:
         self.enabled = 0
         self.scale = 0
-        self.sampleRate;
+        self.sampleRate = 0
     # New accel stuff:
         self.enableX = 0
         self.enableY = 0
@@ -360,9 +359,9 @@ class LSM9DS1:
     # 				If IMU_MODE_SPI, this is the chip select pin of the gyro (CS_AG)
     #	- mAddr = If IMU_MODE_I2C, this is the I2C address of the magnetometer.
     #				If IMU_MODE_SPI, this is the cs pin of the magnetometer (CS_M)
-    def __init__(self):
-        self.init(IMU_MODE_I2C, LSM9DS1_AG_ADDR(1), LSM9DS1_M_ADDR(1))    
-    def __init__(self,interface, xgAddr, mAddr):
+#    def __init__(self):
+#        self.init(IMU_MODE_I2C, LSM9DS1_AG_ADDR(1), LSM9DS1_M_ADDR(1))    
+    def __init__(self, interface = IMU_MODE_I2C, xgAddr = 0x6B, mAddr = 0x1E):
         self.init(interface, xgAddr, mAddr)
     #
     
@@ -479,13 +478,8 @@ class LSM9DS1:
         
         # _autoCalc keeps track of whether we're automatically subtracting off
         # accelerometer and gyroscope bias calculated in calibrate().
-        self._autoCalc = false;
+        self._autoCalc = False;
         
-        # x_mAddress and gAddress store the I2C address or SPI chip select pin
-        # for each sensor.
-        self._mAddress = settings.device.mAddress
-        self._xgAddress = settings.device.agAddress
-    
         # gRes, aRes, and mRes store the current resolution for each sensor. 
         # Units of these values would be DPS (or g's or Gs's) per ADC tick.
         # This value is calculated as (sensor scale) / (2^15).
@@ -501,10 +495,7 @@ class LSM9DS1:
     # begin() -- Initialize the gyro, accelerometer, and magnetometer.
     # This will set up the scale and output rate of each sensor. The values set
     # in the IMUSettings struct will take effect after calling this function.
-    def begin(self, ):
-        #! Todo: don't use _xgAddress or _mAddress, duplicating memory
-        self._xgAddress = settings.device.agAddress
-        self._mAddress = settings.device.mAddress
+    def begin(self):
         
         self.constrainScales()
         # Once we have the scale values, we can calculate the resolution
@@ -514,15 +505,15 @@ class LSM9DS1:
         self.calcaRes() # Calculate g / ADC tick, stored in aRes variable
     
         # Now, initialize our hardware interface.
-        if settings.device.commInterface == IMU_MODE_I2C:	# If we're using I2C
-            initI2C();	# Initialize I2C
-        #elif (settings.device.commInterface == IMU_MODE_SPI): 	# else, if we're using SPI
-        #    initSPI();	# Initialize SPI
+        if self.device.commInterface == IMU_MODE_I2C:	# If we're using I2C
+            self.initI2C();	# Initialize I2C
+        #elif (self.device.commInterface == IMU_MODE_SPI): 	# else, if we're using SPI
+        #    self.initSPI();	# Initialize SPI
         
         # To verify communication, we can read from the WHO_AM_I register of
         # each device. Store those in a variable so we can return them.
-        mTest = mReadByte(WHO_AM_I_M)		# Read the gyro WHO_AM_I
-        xgTest = xgReadByte(WHO_AM_I_XG)	# Read the accel/mag WHO_AM_I
+        mTest = self.mReadByte(WHO_AM_I_M)		# Read the gyro WHO_AM_I
+        xgTest = self.xgReadByte(WHO_AM_I_XG)	# Read the accel/mag WHO_AM_I
         whoAmICombined = (xgTest << 8) | mTest
     
         if (whoAmICombined != ((WHO_AM_I_AG_RSP << 8) | WHO_AM_I_M_RSP)):
@@ -542,8 +533,8 @@ class LSM9DS1:
     # for subtraction from all subsequent data. There are no gyro and accelerometer bias registers to store
     # the data as there are in the ADXL345, a precursor to the LSM9DS0, or the MPU-9150, so we have to
     # subtract the biases ourselves. This results in a more accurate measurement in general and can
-    # remove errors due to imprecise or varying initial placement. Calibration of sensor data in this manner
-    # is good practice.
+    # remove errors due to imprecise or varying initial placement. Calibration of sensor data in this
+    # manner is good practice.
     def calibrate(self, autoCalc = True):
         data = [0, 0, 0, 0, 0, 0]
         samples = 0;
@@ -558,21 +549,21 @@ class LSM9DS1:
         #
         for ii in range(samples): # (ii = 0; ii < samples ; ii++) 
             # Read the gyro data stored in the FIFO
-            self.readGyro();
-            gBiasRawTemp[0] += gx;
-            gBiasRawTemp[1] += gy;
-            gBiasRawTemp[2] += gz;
-            self.readAccel();
-            aBiasRawTemp[0] += ax;
-            aBiasRawTemp[1] += ay;
-            aBiasRawTemp[2] += az - (1./self.aRes); # Assumes sensor facing up!
+            self.readGyro()
+            gBiasRawTemp[0] += self.gx
+            gBiasRawTemp[1] += self.gy
+            gBiasRawTemp[2] += self.gz
+            self.readAccel()
+            aBiasRawTemp[0] += self.ax
+            aBiasRawTemp[1] += self.ay
+            aBiasRawTemp[2] += self.az #  - (1./self.aRes) # Assumes sensor facing up!
         #
         
         for ii in range(3): # (ii = 0; ii < 3; ii++)
             self.gBiasRaw[ii] = gBiasRawTemp[ii] / samples;
-            self.gBias[ii] = calcGyro(gBiasRaw[ii]);
+            self.gBias[ii] = self.calcGyro(gBiasRaw[ii]);
             self.aBiasRaw[ii] = aBiasRawTemp[ii] / samples;
-            self.aBias[ii] = calcAccel(aBiasRaw[ii]);
+            self.aBias[ii] = self.calcAccel(aBiasRaw[ii]);
         #
         
         self.enableFIFO(False);
@@ -587,8 +578,7 @@ class LSM9DS1:
     
         for i in range(128):
             while not self.magAvailable(): pass
-            self.readMag();
-            magTemp[3] = [self.mx, self.my, self.mz]
+            magTemp = self.readMag()
             for j in range(3):
                 if (magTemp[j] > magMax[j]): magMax[j] = magTemp[j];
                 if (magTemp[j] < magMin[j]): magMin[j] = magTemp[j];
@@ -596,8 +586,8 @@ class LSM9DS1:
         #
         for j in range(3):
             self.mBiasRaw[j] = (magMax[j] + magMin[j]) / 2;
-            self.mBias[j] = self.calcMag(mBiasRaw[j]);
-            if (loadIn): self.magOffset(j, mBiasRaw[j]);
+            self.mBias[j] = self.calcMag(self.mBiasRaw[j]);
+            if (loadIn): self.magOffset(j, self.mBiasRaw[j]);
         #
     #
     def magOffset(self, axis, offset):
@@ -612,7 +602,7 @@ class LSM9DS1:
     # if new data is available.
     # Output:	1 - New data available
     #			0 - No new data available
-    def accelAvailable(self, ):
+    def accelAvailable(self):
         status = self.xgReadByte(STATUS_REG_1);
         return (status & (1<<0));
     #
@@ -621,7 +611,7 @@ class LSM9DS1:
     # if new data is available.
     # Output:	1 - New data available
     #			0 - No new data available
-    def gyroAvailable(self, ):
+    def gyroAvailable(self):
         status = self.xgReadByte(STATUS_REG_1);
         return ((status & (1<<1)) >> 1);
     #
@@ -630,7 +620,7 @@ class LSM9DS1:
     # if new data is available.
     # Output:	1 - New data available
     #			0 - No new data available
-    def tempAvailable(self, ):
+    def tempAvailable(self):
         status = self.xgReadByte(STATUS_REG_1);
         return ((status & (1<<2)) >> 2);
     #
@@ -644,7 +634,7 @@ class LSM9DS1:
     # Output:	1 - New data available
     #			0 - No new data available
     def magAvailable(self, axis = lsm9ds1_axis.ALL_AXIS):
-        status = mReadByte(STATUS_REG_M);
+        status = self.mReadByte(STATUS_REG_M);
         return ((status & (1<<axis.value)) >> axis.value);
     #
     
@@ -652,7 +642,7 @@ class LSM9DS1:
     # This function will read all six gyroscope output registers.
     # The readings are stored in the class' gx, gy, and gz variables. Read
     # those _after_ calling readGyro().
-    def readGyro(self, ):
+    def readGyro(self):
         temp = self.xgReadBytes(OUT_X_L_G, 6); # Read 6 bytes, beginning at OUT_X_L_G
         self.gx = (temp[1] << 8) | temp[0]; # Store x-axis values into gx
         self.gy = (temp[3] << 8) | temp[2]; # Store y-axis values into gy
@@ -661,6 +651,7 @@ class LSM9DS1:
             self.gx -= self.gBiasRaw[X_AXIS];
             self.gy -= self.gBiasRaw[Y_AXIS];
             self.gz -= self.gBiasRaw[Z_AXIS];
+        return (self.gx, self.gy, self.gz)
     #
     
     # int16_t readGyro(axis) -- Read a specific axis of the gyroscope.
@@ -669,7 +660,7 @@ class LSM9DS1:
     #	- axis: can be either X_AXIS, Y_AXIS, or Z_AXIS.
     # Output:
     #	A 16-bit signed integer with sensor data on requested axis.
-    def readGyro(self, axis):
+    def readGyroAxis(self, axis):
         temp = self.xgReadBytes(OUT_X_L_G + (2 * axis.value), 2);
         value = (temp[1] << 8) | temp[0];
         if (self._autoCalc):
@@ -681,7 +672,7 @@ class LSM9DS1:
     # This function will read all six accelerometer output registers.
     # The readings are stored in the class' ax, ay, and az variables. Read
     # those _after_ calling readAccel().
-    def readAccel(self, ):
+    def readAccel(self):
         temp = self.xgReadBytes(OUT_X_L_XL, 6); # Read 6 bytes, beginning at OUT_X_L_XL
         self.ax = (temp[1] << 8) | temp[0]; # Store x-axis values into ax
         self.ay = (temp[3] << 8) | temp[2]; # Store y-axis values into ay
@@ -690,6 +681,7 @@ class LSM9DS1:
             self.ax -= self.aBiasRaw[X_AXIS];
             self.ay -= self.aBiasRaw[Y_AXIS];
             self.az -= self.aBiasRaw[Z_AXIS];
+        return (self.ax, self.ay, self.az)
     #
     
     # int16_t readAccel(axis) -- Read a specific axis of the accelerometer.
@@ -698,7 +690,7 @@ class LSM9DS1:
     #	- axis: can be either X_AXIS, Y_AXIS, or Z_AXIS.
     # Output:
     #	A 16-bit signed integer with sensor data on requested axis.
-    def readAccel(self, axis):
+    def readAccelAxis(self, axis):
         temp = self.xgReadBytes(OUT_X_L_XL + (2 * axis.value), 2);
         value = (temp[1] << 8) | temp[0];
         
@@ -710,11 +702,12 @@ class LSM9DS1:
     # This function will read all six magnetometer output registers.
     # The readings are stored in the class' mx, my, and mz variables. Read
     # those _after_ calling readMag().
-    def readMag(self, ):
+    def readMag(self):
         temp = self.mReadBytes(OUT_X_L_M, 6); # Read 6 bytes, beginning at OUT_X_L_M
         self.mx = (temp[1] << 8) | temp[0]; # Store x-axis values into mx
         self.my = (temp[3] << 8) | temp[2]; # Store y-axis values into my
         self.mz = (temp[5] << 8) | temp[4]; # Store z-axis values into mz
+        return (self.mx, self.my, self.mz)
     #
     
     
@@ -724,7 +717,7 @@ class LSM9DS1:
     #	- axis: can be either X_AXIS, Y_AXIS, or Z_AXIS.
     # Output:
     #	A 16-bit signed integer with sensor data on requested axis.
-    def readMag(self, axis):
+    def readMagAxis(self, axis):
         temp = self.mReadBytes(OUT_X_L_M + (2 * axis.value), 2);
         return (temp[1] << 8) | temp[0];
     #
@@ -733,9 +726,10 @@ class LSM9DS1:
     # This function will read two temperature output registers.
     # The combined readings are stored in the class' temperature variables. Read
     # those _after_ calling readTemp().
-    def readTemp(self, ):
+    def readTemp(self):
         temp = self.xgReadBytes(OUT_TEMP_L, 2); # Read 2 bytes, beginning at OUT_TEMP_L
-        temperature = (temp[1] << 8) | temp[0];
+        self.temperature = (temp[1] << 8) | temp[0]
+        return self.temperature
     #
     
     # calcGyro() -- Convert from RAW signed 16-bit value to degrees per second
@@ -745,7 +739,12 @@ class LSM9DS1:
     #	- gyro = A signed 16-bit raw reading from the gyroscope.
     def calcGyro(self, gyro):
         # Return the gyro raw reading times our pre-calculated DPS / (ADC tick):
-        return gRes * gyro
+        return self.gRes * gyro
+    
+    def readGyroCal(self):
+        # Return the gyro raw reading times our pre-calculated DPS / (ADC tick):
+        g = self.readGyro()
+        return (g[0]*self.gRes, g[1]*self.gRes, g[2]*self.gRes)
     
     # calcAccel() -- Convert from RAW signed 16-bit value to gravity (g's).
     # This function reads in a signed 16-bit value and returns the scaled
@@ -754,7 +753,13 @@ class LSM9DS1:
     #	- accel = A signed 16-bit raw reading from the accelerometer.
     def calcAccel(self, accel):
         # Return the accel raw reading times our pre-calculated g's / (ADC tick):
-        return aRes * accel
+        return self.aRes * accel
+    
+    def readAccelCal(self):
+        # Return the gyro raw reading times our pre-calculated DPS / (ADC tick):
+        a = self.readAccel()
+        return (a[0]*self.aRes, a[1]*self.aRes, a[2]*self.aRes)
+    #
     
     # calcMag() -- Convert from RAW signed 16-bit value to Gauss (Gs)
     # This function reads in a signed 16-bit value and returns the scaled
@@ -763,7 +768,13 @@ class LSM9DS1:
     #	- mag = A signed 16-bit raw reading from the magnetometer.
     def calcMag(self, mag):
         # Return the mag raw reading times our pre-calculated Gs / (ADC tick):
-        return mRes * mag
+        return self.mRes * mag
+    
+    def readMagCal(self):
+        # Return the gyro raw reading times our pre-calculated DPS / (ADC tick):
+        m = self.readMag()
+        return (m[0]*self.mRes, m[1]*self.mRes, m[2]*self.mRes)
+    #
     
     # setGyroScale() -- Set the full-scale range of the gyroscope.
     # This function can be called to set the scale of the gyroscope to 
@@ -1053,7 +1064,7 @@ class LSM9DS1:
     #
     
     # getGyroIntSrc() -- Get contents of Gyroscope interrupt source register
-    def getGyroIntSrc(self, ):
+    def getGyroIntSrc(self):
         intSrc = self.xgReadByte(INT_GEN_SRC_G);
         # Check if the IA_G (interrupt active) bit is set
         if intSrc & (1<<6):
@@ -1062,7 +1073,7 @@ class LSM9DS1:
     #
     
     # getGyroIntSrc() -- Get contents of accelerometer interrupt source register
-    def getAccelIntSrc(self, ):
+    def getAccelIntSrc(self):
         intSrc = self.xgReadByte(INT_GEN_SRC_XL);
         # Check if the IA_XL (interrupt active) bit is set
         if (intSrc & (1<<6)):
@@ -1071,7 +1082,7 @@ class LSM9DS1:
     #
     
     # getGyroIntSrc() -- Get contents of magnetometer interrupt source register
-    def getMagIntSrc(self, ):
+    def getMagIntSrc(self):
         intSrc = self.mReadByte(INT_SRC_M)
         # Check if the INT (interrupt active) bit is set
         if (intSrc & (1<<0)):
@@ -1080,7 +1091,7 @@ class LSM9DS1:
     #
     
     # getGyroIntSrc() -- Get status of inactivity interrupt
-    def getInactivity(self, ):
+    def getInactivity(self):
         temp = self.xgReadByte(STATUS_REG_0);
         temp &= (0x10);
         return temp;
@@ -1119,11 +1130,11 @@ class LSM9DS1:
             threshold = fifoThs 
         else: 
             threshold = 0x1F;
-        self.xgWriteByte(FIFO_CTRL, ((fifoMode.value & 0x7) << 5) | (threshold & 0x1F));
+        self.xgWriteByte(FIFO_CTRL, ((fifoMode & 0x7) << 5) | (threshold & 0x1F));
     #
     
     # getFIFOSamples() - Get number of FIFO samples
-    def getFIFOSamples(self, ):
+    def getFIFOSamples(self):
         return (self.xgReadByte(FIFO_SRC) & 0x3F);
     #
     
@@ -1141,7 +1152,7 @@ class LSM9DS1:
     #	- CTRL_REG4_G = 0x00: Continuous update mode. Data LSB stored in lower
     #		address. Scale set to 245 DPS. SPI mode set to 4-wire.
     #	- CTRL_REG5_G = 0x00: FIFO disabled. HPF disabled.
-    def initGyro(self, ):
+    def initGyro(self):
         tempRegValue = 0;
         
         # CTRL_REG1_G (Default value: 0x00)
@@ -1152,16 +1163,16 @@ class LSM9DS1:
         
         # To disable gyro, set sample rate bits to 0. We'll only set sample
         # rate if the gyro is enabled.
-        if (settings.gyro.enabled):
+        if (self.gyro.enabled):
             tempRegValue = (self.gyro.sampleRate & 0x07) << 5;
         #
-        if settings.gyro.scale == 500:
+        if self.gyro.scale == 500:
             tempRegValue |= (0x1 << 3);
-        elif settings.gyro.scale == 2000:
+        elif self.gyro.scale == 2000:
             tempRegValue |= (0x3 << 3);
             # Otherwise we'll set it to 245 dps (0x0 << 4)
         #
-        tempRegValue |= (settings.gyro.bandwidth & 0x3)
+        tempRegValue |= (self.gyro.bandwidth & 0x3)
         self.xgWriteByte(CTRL_REG1_G, tempRegValue)
         
         # CTRL_REG2_G (Default value: 0x00)
@@ -1180,7 +1191,7 @@ class LSM9DS1:
         else:
             tempRegValue = 0;
         #
-        if (settings.gyro.HPFEnable):
+        if (self.gyro.HPFEnable):
             tempRegValue |= (1<<6) | (self.gyro.HPFCutoff & 0x0F);
         #
         self.xgWriteByte(CTRL_REG3_G, tempRegValue)
@@ -1218,7 +1229,7 @@ class LSM9DS1:
     #		all axes enabled.
     #	- CTRL_REG2_XM = 0x00:  2g scale. 773 Hz anti-alias filter BW.
     #	- CTRL_REG3_XM = 0x04: Accel data ready signal on INT1_XM pin.
-    def initAccel(self, ):
+    def initAccel(self):
         tempRegValue = 0;
         
         #	CTRL_REG5_XL (0x1F) (Default value: 0x38)
@@ -1279,7 +1290,7 @@ class LSM9DS1:
     #	- CTRL_REG6_XM = 0x00:  2 Gs scale.
     #	- CTRL_REG7_XM = 0x00: Continuous conversion mode. Normal HPF mode.
     #	- INT_CTRL_REG_M = 0x09: Interrupt active-high. Enable interrupts.
-    def initMag(self, ):
+    def initMag(self):
         tempRegValue = 0;
         
         # CTRL_REG1_M (Default value: 0x10)
@@ -1351,9 +1362,9 @@ class LSM9DS1:
         # Whether we're using I2C or SPI, read a byte using the
         # accelerometer-specific I2C address or SPI CS pin.
         if (self.device.commInterface == IMU_MODE_I2C):
-            return I2CreadByte(self._mAddress, subAddress);
+            return self.I2CreadByte(self.device.mAddress, subAddress);
     #    else if (self.device.commInterface == IMU_MODE_SPI)
-    #        return SPIreadByte(self._mAddress, subAddress);
+    #        return self.SPIreadByte(self.device.mAddress, subAddress);
     #
     
     # gReadBytes() -- Reads a number of bytes -- beginning at an address
@@ -1369,9 +1380,9 @@ class LSM9DS1:
         # Whether we're using I2C or SPI, read multiple bytes using the
         # accelerometer-specific I2C address or SPI CS pin.
         if (self.device.commInterface == IMU_MODE_I2C):
-            return self.I2CreadBytes(self._mAddress, subAddress, count);
+            return self.I2CreadBytes(self.device.mAddress, subAddress, count);
     #    else if (self.device.commInterface == IMU_MODE_SPI)
-    #        return self.SPIreadBytes(self._mAddress, subAddress, count);
+    #        return self.SPIreadBytes(self.device.mAddress, subAddress, count);
     #
     
     # gWriteByte() -- Write a byte to a register in the gyroscope.
@@ -1382,9 +1393,9 @@ class LSM9DS1:
         # Whether we're using I2C or SPI, write a byte using the
         # accelerometer-specific I2C address or SPI CS pin.
         if (self.device.commInterface == IMU_MODE_I2C):
-            return self.I2CwriteByte(self._mAddress, subAddress, data);
+            return self.I2CwriteByte(self.device.mAddress, subAddress, data);
     #    else if (self.device.commInterface == IMU_MODE_SPI)
-    #        return SPIwriteByte(self._mAddress, subAddress, data);
+    #        return SPIwriteByte(self.device.mAddress, subAddress, data);
     #
     
     # xmReadByte() -- Read a byte from a register in the accel/mag sensor
@@ -1396,9 +1407,9 @@ class LSM9DS1:
         # Whether we're using I2C or SPI, read a byte using the
         # gyro-specific I2C address or SPI CS pin.
         if (self.device.commInterface == IMU_MODE_I2C):
-            return I2CreadByte(self._xgAddress, subAddress);
+            return self.I2CreadByte(self.device.agAddress, subAddress);
     #    else if (self.device.commInterface == IMU_MODE_SPI)
-    #        return SPIreadByte(self._xgAddress, subAddress);
+    #        return self.SPIreadByte(self.device.agAddress, subAddress);
     #
     
     # xmReadBytes() -- Reads a number of bytes -- beginning at an address
@@ -1414,9 +1425,9 @@ class LSM9DS1:
         # Whether we're using I2C or SPI, read multiple bytes using the
         # gyro-specific I2C address or SPI CS pin.
         if (self.device.commInterface == IMU_MODE_I2C):
-            return self.I2CreadBytes(self._xgAddress, subAddress, count);
+            return self.I2CreadBytes(self.device.agAddress, subAddress, count);
     #    else if (self.device.commInterface == IMU_MODE_SPI)
-    #        return SPIreadBytes(self._xgAddress, subAddress, count);
+    #        return SPIreadBytes(self.device.agAddress, subAddress, count);
     #
     
     # xmWriteByte() -- Write a byte to a register in the accel/mag sensor.
@@ -1427,21 +1438,21 @@ class LSM9DS1:
         # Whether we're using I2C or SPI, write a byte using the
         # gyro-specific I2C address or SPI CS pin.
         if (self.device.commInterface == IMU_MODE_I2C):
-            self.I2CwriteByte(self._xgAddress, subAddress, data);
+            self.I2CwriteByte(self.device.agAddress, subAddress, data);
         #else if (self.device.commInterface == IMU_MODE_SPI)
-        #    SPIwriteByte(self._xgAddress, subAddress, data);
+        #    SPIwriteByte(self.device.agAddress, subAddress, data);
     #
     
     # calcgRes() -- Calculate the resolution of the gyroscope.
     # This function will set the value of the gRes variable. gScale must
     # be set prior to calling this function.
-    def calcgRes(self, ):
+    def calcgRes(self):
         self.gRes = self.gyro.scale / 32768.0
     
     # calcmRes() -- Calculate the resolution of the magnetometer.
     # This function will set the value of the mRes variable. mScale must
     # be set prior to calling this function.
-    def calcmRes(self, ):
+    def calcmRes(self):
         #mRes = ((float) self.mag.scale) / 32768.0;
         if self.mag.scale ==  4:
             self.mRes = magSensitivity[0];
@@ -1456,13 +1467,13 @@ class LSM9DS1:
     # calcaRes() -- Calculate the resolution of the accelerometer.
     # This function will set the value of the aRes variable. aScale must
     # be set prior to calling this function.
-    def calcaRes(self, ):
+    def calcaRes(self):
         self.aRes = self.accel.scale / 32768.0
     
     ###########
     # Helper Functions #
     ###########
-    def constrainScales(self, ):
+    def constrainScales(self):
         if ((self.gyro.scale != 245) and (self.gyro.scale != 500) and (self.gyro.scale != 2000)):
             self.gyro.scale = 245
         #
@@ -1479,7 +1490,7 @@ class LSM9DS1:
     #########/
     # initSPI() -- Initialize the SPI hardware.
     # This function will setup all SPI pins and related hardware.
-    #def initSPI(self, );
+    #def initSPI(self);
     
     # SPIwriteByte() -- Write a byte out of SPI to a register in the device
     # Input:
@@ -1517,7 +1528,7 @@ class LSM9DS1:
     
     # initI2C() -- Initialize the I2C hardware.
     # This function will setup all I2C pins and related hardware.
-    def initI2C(self, ):
+    def initI2C(self):
         self.bus = SMBus(1)
     #
     
@@ -1549,15 +1560,26 @@ class LSM9DS1:
     # Output: No value is returned by the function, but the registers read are
     # 		all stored in the *dest array given.
     def I2CreadBytes(self, address, subAddress, count):
-        arr =  self.bus.read_block_data(address, subAddress&0xFF)
+        arr =  self.bus.read_i2c_block_data(address, subAddress&0xFF, count)
         print(arr)
-        return arr
+        return arr[0:count]
     #
 #
 
 
 
 
+
+
+imu = LSM9DS1()
+imu.begin()
+#imu.calibrate()
+imu.calibrateMag()
+
+print(imu.readAccelCal())
+print(imu.readGyroCal())
+print(imu.readMagCal())
+print(imu.readTemp())
 
 
 
