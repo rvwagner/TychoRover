@@ -1,7 +1,7 @@
 body {
 background-color: black;
 }
-#content {
+.content {
   width: 1024px;
   height: 600px;
   background-color:black;
@@ -23,10 +23,17 @@ div#rosConnecting p {
   transform: translate(-50%, -50%);
 }
 .rosTable {
+  height: 600px;
+  width: 1024px;
   margin: 0px;
   padding: 0px;
   border-width: 0px;
   background-color: transparent;
+}
+tbody {
+  height: 600px !important;
+  width: 1024px;
+  line-height: 0px;
 }
 .rosTD {
   margin: 0px;

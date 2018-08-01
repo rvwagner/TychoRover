@@ -3,7 +3,6 @@ import rospy
 from tycho.msg import PowerMonitor
 
 
-def pub(x,y):
     
 #
 
@@ -23,7 +22,7 @@ if __name__ == '__main__':
     msg.panel_5v_a      = 1.5
     
     rospy.init_node('FakeJoystick')
-    joy_pub = rospy.Publisher('tycho/joy', Joy, queue_size=1)
+    joy_pub = rospy.Publisher('tycho/power_monitor', PowerMonitor, queue_size=1)
     
     x = 0.0
     x_sign = 1

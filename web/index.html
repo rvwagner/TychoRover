@@ -14,8 +14,76 @@
 </head>
 
 <body>
-  <div id="content">
+  <div id="rosConnect" class="content">
+    <div id="rosConnecting">
+      <p>Connecting to Tycho</p>
+    </div>
+  </div>
+  <div id="rosWheelStatus" class="content">
+    <table class="rosTable"><tr>
+      <td class="rosTD" style="width:344px;">
+        <table class="rosTable wsTable"><tr class="rosTR wsTR"><td class="rosTD">
+          <canvas id="wssAmpsFL" class="fLeft"></canvas>
+          <canvas id="wssTempFL" class="fLeft"></canvas>
+          <canvas id="wsdAmpsFL" class="fLeft"></canvas>
+          <canvas id="wsdTempFL" class="fLeft"></canvas>
+          <canvas id="wsdRpmFL" class="fLeft"></canvas>
+        </td></tr><tr class="rosTR wsTR"><td class="rosTD">
+          <canvas id="wssAmpsBL" class="fLeft"></canvas>
+          <canvas id="wssTempBL" class="fLeft"></canvas>
+          <canvas id="wsdAmpsBL" class="fLeft"></canvas>
+          <canvas id="wsdTempBL" class="fLeft"></canvas>
+          <canvas id="wsdRpmBL" class="fLeft"></canvas>
+        </td></tr></table>
+      </td>
+      <td class="rosTD" style="width:336px;">
+        <div id="roverWheelStatus">
+          <img src="images/tychoChassis.png"></img>
+          <img id="wheelFL" class="wss" src="images/tychoWheelFL.png"></img>
+          <img id="wheelFR" class="wss" src="images/tychoWheelFR.png"></img>
+          <img id="wheelBL" class="wss" src="images/tychoWheelBL.png"></img>
+          <img id="wheelBR" class="wss" src="images/tychoWheelBR.png"></img>
+          <div id="wssAngleFL" class="wssAngle"></div>
+          <div id="wssAngleFR" class="wssAngle"></div>
+          <div id="wssAngleBL" class="wssAngle"></div>
+          <div id="wssAngleBR" class="wssAngle"></div>
+        </div>
+      </td>
+      <td class="rosTD" style="width:344px;">
+        <table class="rosTable wsTable"><tr class="rosTR wsTR"><td class="rosTD">
+          <canvas id="wssAmpsFR" class="fRight"></canvas>
+          <canvas id="wssTempFR" class="fRight"></canvas>
+          <canvas id="wsdAmpsFR" class="fRight"></canvas>
+          <canvas id="wsdTempFR" class="fRight"></canvas>
+          <canvas id="wsdRpmFR" class="fRight"></canvas>
+        </td></tr><tr class="rosTR wsTR"><td class="rosTD">
+          <canvas id="wssAmpsBR" class="fRight"></canvas>
+          <canvas id="wssTempBR" class="fRight"></canvas>
+          <canvas id="wsdAmpsBR" class="fRight"></canvas>
+          <canvas id="wsdTempBR" class="fRight"></canvas>
+          <canvas id="wsdRpmBR" class="fRight"></canvas>
+        </td></tr></table>
+    </tr></table>'
+  </div>
+  <div id="rosPowerStatus" class="content">
+    <table class="rosTable wsTable"><tr class="rosTR wsTR"><td class="rosTD">
+      <canvas id="psvBat1" class="fLeft"></canvas>
+      <canvas id="psvBat2" class="fLeft"></canvas>
+      <canvas id="psvBat3" class="fLeft"></canvas>
+      <canvas id="psvBat4" class="fLeft"></canvas>
+      <canvas id="psvPanel12v" class="fLeft"></canvas>
+      <canvas id="psvPanel5v" class="fLeft"></canvas>
+    </td></tr><tr class="rosTR wsTR"><td class="rosTD">
+      <canvas id="psaMaster" class="fLeft"></canvas>
+      <canvas id="psaFrontRelay" class="fLeft"></canvas>
+      <canvas id="psaRearRelay" class="fLeft"></canvas>
+      <canvas id="psaPanelDisplay" class="fLeft"></canvas>
+      <canvas id="psaPanel12v" class="fLeft"></canvas>
+      <canvas id="psaPanel5v" class="fLeft"></canvas>
+    </td></tr></table>
   </div>
   <button id="btnStop">Cancel</button>
+  <button id="btnJoy1">Wheel Status</button>
+  <button id="btnJoy2">Power Monitor</button>
 </body>
 </html>
