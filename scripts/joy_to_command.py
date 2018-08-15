@@ -12,10 +12,10 @@ from math import atan2, sqrt, pi, atan
 # into commands for the Tycho rover
 
 # FIXME: Should load this from a parameter file
-# Max speed in m/s
-TYCHO_MAX_SPEED = 1.0
+# Max speed in mm/s
+TYCHO_MAX_SPEED = 1000.0
 TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 3
-TYCHO_MAX_SPIN_SPEED = 1.0
+TYCHO_MAX_SPIN_SPEED = 1000.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
 TYCHO_MINIMUM_TURN_RADIUS = 1

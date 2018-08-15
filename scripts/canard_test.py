@@ -1,7 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from canard import can
-from canard.hw import cantact
+#from canard.hw import cantact
+from canard.hw import socketcan
 
 import rospy
 from tycho.msg import WheelAnglesSpeeds
@@ -19,16 +20,17 @@ import struct # For converting incoming packet data to ints
 # Give serial port a swift kick in the pants
 # Without opening, writing to, and closing the port, it apparently forgets
 # how to write once the CANable stuff starts (full output buffer?).
-import serial
-port = glob("/dev/ttyACM?")[-1]
-print "Executing serial SKITP protocol on %s"%port
-ser = serial.Serial(port, 9600, timeout=1)
-ser.write(b'\r')
-ser.close()
-ser = serial.Serial(port, 9600, timeout=1)
-ser.write(b'\r')
-ser.close()
-print("Done")
+#import serial
+#port = "/dev/CAN"
+port = "auto"
+#print "Executing serial SKITP protocol on %s"%port
+#ser = serial.Serial(port, 9600, timeout=1)
+#ser.write(b'\r')
+#ser.close()
+#ser = serial.Serial(port, 9600, timeout=1)
+#ser.write(b'\r')
+#ser.close()
+#print("Done")
 
 # TODO: Organize this in an appropriate place
 PacketTypes = Enum('PacketTypes', 'TPDO heartbeat other')
@@ -44,20 +46,25 @@ class TychoCANable:
                "data": [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]}
     }
     self.startCANable(port=port)
+    
+    self.frameCount=0
+    self.lastMessageTime = rospy.Time(0)
+    self.messageInterval = 1.0/20 # second mnumber is Hz
   #
   
   
   def startCANable(self, port="auto", bitrate=250000):
-    if port == "auto":
-      print("Finding serial port")
-      port = glob("/dev/ttyACM?")[-1]
+   # if port == "auto":
+    #  print("Finding serial port")
+     # port = "/dev/CAN"
     #
     
     print("Connecting to serial port '%s'"%port)
-    self.dev = cantact.CantactDev( port ) # just opens the serial port
+    #self.dev = cantact.CantactDev( port ) # just opens the serial port
+    self.dev = socketcan.SocketCanDev("can0")
     
-    print("Setting bitrate to 250k")
-    self.dev.set_bitrate(250000) # 250,000 = s5
+    #print("Setting bitrate to 250k")
+    #self.dev.set_bitrate(250000) # 250,000 = s5
     
     print("Starting CANable")
     self.dev.start()
@@ -74,7 +81,7 @@ class TychoCANable:
     try:
       commandInfo = self.specialCommands[commandType]
     except e:
-      print e
+      print(e)
       # TODO: Better handling
       return False
     return self.buildRawCommand(dest, commandInfo.header, commandInfo.dlc, commandInfo.data)
@@ -98,7 +105,7 @@ class TychoCANable:
     
     # Frame ID is 0x200/300/400/500 + node ID
     header = (0x100 + 0x100*index)|dest
-    if header == 0x201: print("Building frame 0x%03X : %d, %d"%(header, int1, int2))
+    #if header == 0x201: print("Building frame 0x%03X : %d, %d"%(header, int1, int2))
     frame = can.Frame(header)
     frame.dlc = 8
     frame.data = [
@@ -147,8 +154,8 @@ class TychoCANable:
       return 0,0,0,0
     # print "%02X %02X %02X %02X %02X %02X %02X %02X"%tuple(frame.data)
     
-    data1 =  struct.unpack("<i", str(bytearray(frame.data[:4])))[0]
-    data2 =  struct.unpack("<i", str(bytearray(frame.data[4:])))[0]
+    data1 =  struct.unpack("<i", bytearray(frame.data[:4]))[0]
+    data2 =  struct.unpack("<i", bytearray(frame.data[4:]))[0]
     
     return index, source, data1, data2
   #
@@ -161,7 +168,11 @@ class TychoCANable:
   
   
   def sendFrame(self, frame):
-    #print("Sending frame "+str(frame))
+    #if (rospy.Time.now() - self.lastMessageTime).to_sec() < self.messageInterval:
+    #        return
+    self.lastMessageTime = rospy.Time.now()
+    self.frameCount = self.frameCount+1
+    #print("Sending frame %d: %s"%(self.frameCount,str(frame)) )
     return self.dev.send(frame)
   #
   
@@ -183,8 +194,6 @@ class TychoCANable:
     return self.dev.stop()
   #
 # END CLASS
-
-
 
 
 def updatePID(p,i,d):
@@ -210,38 +219,14 @@ def clearESTOP(node):
 #
 
 
-frontLeftID  = 1
-frontRightID = 2
-backLeftID   = 3
-backRightID  = 4
-speedMultiplier = 100
-angleMultiplier = 10
 
 def new_command_callback(data):
-    #print("Recieved command: %.2f m/s at %.1f deg"%(data.back_left_speed, data.back_left_angle))
+    print("Recieved command: %.2f mm/s at %.1f deg"%(data.back_left_speed, data.back_left_angle))
     canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(frontRightID, 1, round(data.front_right_speed * speedMultiplier), round( data.front_right_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(backLeftID, 1, round(data.back_left_speed * speedMultiplier), round(data.back_left_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(backRightID, 1, round(data.back_right_speed * speedMultiplier), round(data.back_right_angle * angleMultiplier)))
 #
-
-# starts the node
-
-print("Subscribing to topic")
-# Subscribe to low-level commands topic
-rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback)
-    
-# Publish topic with current wheel sensor statuses
-# TODO: Maybe break this up into a couple of topics?
-statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus, queue_size=10)
-
-# starts the node
-rospy.init_node('CAN_Handler')
-
-
-ready_to_send = [0x0,0x0,0x0,0x0,0x0]
-wheel_statuses = [0, WheelStatus(), WheelStatus(), WheelStatus(), WheelStatus()]
-for i in (1,2,3,4): wheel_statuses[i].wheel_id = i
 
 # TODO: Scale these values
 def handleTPDO(index, node, data1, data2):
@@ -266,7 +251,7 @@ def handleTPDO(index, node, data1, data2):
 	#
 	
 	if ready_to_send[node] == 0xF:
-		print "Publishing % 5d % 5d % 5d % 5d % 5d % 5d % 5d % 5d"%(wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp)
+		print("Publishing % 5d % 5d % 5d % 5d % 5d % 5d % 5d % 5d"%(wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
 		statuspub.publish(wheel_statuses[node])
 		ready_to_send[node] = 0x0
 	#
@@ -279,9 +264,33 @@ def handleTPDO(index, node, data1, data2):
 
 canable = TychoCANable(port=port)
 
+frontLeftID  = 1
+frontRightID = 2
+backLeftID   = 3
+backRightID  = 4
+speedMultiplier = 1
+angleMultiplier = 10
+
+# starts the node
+rospy.init_node('CAN_Handler')
+
+print("Subscribing to topic")
+# Subscribe to low-level commands topic
+rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback, queue_size=1)
+    
+# Publish topic with current wheel sensor statuses
+# TODO: Maybe break this up into a couple of topics?
+statuspub = rospy.Publisher('tycho/wheel_status', WheelStatus, queue_size=1)
+
+
+ready_to_send = [0x0,0x0,0x0,0x0,0x0]
+wheel_statuses = [0, WheelStatus(), WheelStatus(), WheelStatus(), WheelStatus()]
+for i in (1,2,3,4): wheel_statuses[i].wheel_id = i
+
+
 # Trying broadcast
 
-print "Sending initial frame"
+print("Sending initial frame")
 frame = canable.buildRawCommand(1, 0x200, 8, [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
 canable.sendFrame(frame)
 print(frame)
@@ -304,18 +313,20 @@ maxHeartbeatDelay = rospy.Duration(0.5) # Delay until a controller is declared l
 
 count = 0
 rate = rospy.Rate(100) # Hz
+print ("Starting main loop")
 while not rospy.is_shutdown():
-  now = rospy.get_rostime()
+  #rate.sleep()
+  #continue
   
-count = 0
-rate = rospy.Rate(100) # Hz
-while not rospy.is_shutdown():
+  
   f, packet_type = canable.receiveFrameWithType()
+  # print(f, packet_type)
   if packet_type == PacketTypes.TPDO:
     index, node, data1, data2 = canable.readTPDO(f)
     handleTPDO(index, node, data1, data2)
   elif packet_type == PacketTypes.heartbeat:
     node = canable.readHeartbeat(f)
+    print("Heartbeat ", node)
     lastHeartbeat[node] = now
   else: # Unknwon packet type
     pass

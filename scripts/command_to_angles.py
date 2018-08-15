@@ -38,7 +38,7 @@ class CommandToAngles:
         # Dimensional Model #
         #####################
         
-        self.maxWheelSpeed = 1; # m/s
+        self.maxWheelSpeed = 4200; # mm/s # FIXME: This should be pulled from a config file
         self.steerRate = 500.0; # Servo nominally rotates at 500deg/sec
         # +X is forward, +Y is left, numbers in scale meters
         self.jointX = {'FrontLeft': 1.17, 'FrontRight': 1.17,
@@ -205,6 +205,7 @@ class CommandToAngles:
     # the outer-most wheel to the commanded speed (and other speeds are scaled accordingly).
     def setVehicleSpeed(self, spd):
         currentSpeed = spd;
+        print ("Setting speed to", spd)
         # Set individual wheel speeds based on multiplier array
         # That array inherently takes care of the direction-reversal for spin-in-place
         maxSpd = 0;
@@ -217,8 +218,11 @@ class CommandToAngles:
         # If any wheel is above max speed, scale all speeds down
         if maxSpd > self.maxWheelSpeed:
             scaleFactor = self.maxWheelSpeed / maxSpd;
+            print("scale factor", scaleFactor)
             for i in ['FrontLeft','FrontRight','BackLeft','BackRight']:
+                print(self.wheelSpeeds[i])
                 self.wheelSpeeds[i] *= scaleFactor;
+                print(self.wheelSpeeds[i])
         #
     #
     
