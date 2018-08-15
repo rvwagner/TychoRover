@@ -6,7 +6,7 @@
         <Nodes>
           <Node Text="Scripting">
             <Nodes>
-              <Node Text="Script Auto-Start" Value="1">
+              <Node Text="Script Auto-Start" Value="0">
                 <Nodes />
               </Node>
             </Nodes>
@@ -100,13 +100,13 @@
           <Node Text="Bit Rate" Value="3">
             <Nodes />
           </Node>
-          <Node Text="Node ID" Value="1">
+          <Node Text="Node ID" Value="4">
             <Nodes />
           </Node>
-          <Node Text="Listen Node ID" Value="4">
+          <Node Text="Listen Node ID" Value="0">
             <Nodes />
           </Node>
-          <Node Text="Heartbeat (ms)" Value="2000">
+          <Node Text="Heartbeat (ms)" Value="200">
             <Nodes />
           </Node>
           <Node Text="MiniCAN Send Rate (ms)" Value="100">
@@ -395,7 +395,7 @@
           </Node>
           <Node Text="AIn5" Value="">
             <Nodes>
-              <Node Text="Conversion Type" Value="0">
+              <Node Text="Conversion Type" Value="1">
                 <Nodes />
               </Node>
               <Node Text="Input Use" Value="0">
