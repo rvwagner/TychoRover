@@ -64,7 +64,7 @@ Current_Drive_Speed = 0
 
 
 ' Wait for confirmation that CAN bus is running
-' GoSub SafeUntilSignal
+GoSub SafeUntilSignal
 
 
 '''''''''''''
@@ -111,7 +111,7 @@ top:
         SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)
     End If
     SetCommand(_G, STEER_CHANNEL, commanded_angle_scaled)
-	x = getvalue(_VAR, MASTER_IS_ALIVE_VAR)
+	x = getvalue(_VAR, NEW_PID)
 print("NEW PID ", x,"\n")
     ' Check for PID updates:
     If getvalue(_VAR, NEW_PID) = 1 Then
@@ -121,6 +121,15 @@ print("NEW PID ", x,"\n")
    '   setconfig(_KI, STEER_CHANNEL, getvalue(_VAR, PID_I))
    '   setconfig(_KD, STEER_CHANNEL, getvalue(_VAR, PID_D))
         SetCommand(_VAR, NEW_PID, 0)
+    End If
+	
+	
+    ' Check for master heartbeat
+    If getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 1 Then
+        SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+        SetCommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+    ElseIf GetTimerState(WATCHDOG_TIMER) = 1 Then
+        GoSub SafeUntilSignal
     End If
 	
     ' Set report variables
@@ -162,7 +171,7 @@ Return
 ' safe-until-signal subroutine
 SafeUntilSignal:
 
-	print("Waiting for master heartbeat...")
+	print("Lost master!\n")
     ' Clear the flag that set by the NUC's "heartbeat" RPDO
     setcommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
     
@@ -170,22 +179,26 @@ SafeUntilSignal:
     setcommand(_MSTOP, DRIVE_CHANNEL) ' "Stop in all modes"
     setcommand(_MSTOP, STEER_CHANNEL)
     
+	wait(10)
+	
     ' Wait until both are stopped before signaling brakes
-    While GetConfig(_S, STEER_CHANNEL) <> 0 ' Steering speed (will probably hit 0 first)
-        wait(1)
-    End While
+	' FIXME: THese loops block forever
+    'While GetConfig(_S, STEER_CHANNEL) <> 0 ' Steering speed (will probably hit 0 first)
+    '    wait(1)
+    'End While
     SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
     
-    While GetConfig(_S, DRIVE_CHANNEL) <> 0 ' Driving speed
-        wait(1)
-    End While
+    'While GetConfig(_S, DRIVE_CHANNEL) <> 0 ' Driving speed
+    '    wait(1)
+    'End While
     SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
     
     ' Wait for a signal
+	print("Waiting for master heartbeat...\n")
     While getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 0
         wait(1)
     End While
-	print("Found master!")
+	print("Found master!\n")
     
     SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
 Return
