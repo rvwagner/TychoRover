@@ -14,7 +14,7 @@ from math import atan2, sqrt, pi, atan
 # FIXME: Should load this from a parameter file
 # Max speed in mm/s
 TYCHO_MAX_SPEED = 1000.0
-TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 3
+TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 1
 TYCHO_MAX_SPIN_SPEED = 1000.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
@@ -310,7 +310,7 @@ class JoyToCommand:
     def interpretTurnInPlace(self):
         print('Using interpretTurnInPlace()')
         speed = self.joyState['joyXAxis']
-        speed = self.scaleAndLimitSpeed(-self.joyState['joyXAxis'], TYCHO_MAX_SPIN_SPEED)
+        speed = self.scaleAndLimitSpeed(self.joyState['joyXAxis'], TYCHO_MAX_SPIN_SPEED)
         
         #if speed == 0.0 or self.joyState['buttonStop']:
         #    isBraking = True
