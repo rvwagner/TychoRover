@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+# WARNING: This script must be in python3 for SocketCAN support to work!
+
 
 from canard import can
 #from canard.hw import cantact
@@ -7,8 +9,8 @@ from canard.hw import socketcan
 import rospy
 from tycho.msg import WheelAnglesSpeeds
 from tycho.msg import WheelStatus
+from std_msgs.msg import Float32MultiArray
 
-from glob import glob # For auto-detecting serial port (to be improved)
 from enum import Enum
 import struct # For converting incoming packet data to ints
 
@@ -17,20 +19,7 @@ import struct # For converting incoming packet data to ints
 # SETUP #
 #########
 
-# Give serial port a swift kick in the pants
-# Without opening, writing to, and closing the port, it apparently forgets
-# how to write once the CANable stuff starts (full output buffer?).
-#import serial
-#port = "/dev/CAN"
-port = "auto"
-#print "Executing serial SKITP protocol on %s"%port
-#ser = serial.Serial(port, 9600, timeout=1)
-#ser.write(b'\r')
-#ser.close()
-#ser = serial.Serial(port, 9600, timeout=1)
-#ser.write(b'\r')
-#ser.close()
-#print("Done")
+port = "can0"
 
 # TODO: Organize this in an appropriate place
 PacketTypes = Enum('PacketTypes', 'TPDO heartbeat other')
@@ -40,7 +29,7 @@ PacketTypes = Enum('PacketTypes', 'TPDO heartbeat other')
 ############################
 
 class TychoCANable:
-  def __init__(self, port="auto"):
+  def __init__(self, port="can0"):
     self.specialCommands = {
     "estop" : {"header": 0x600, "dlc": 8,
                "data": [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]}
@@ -53,7 +42,7 @@ class TychoCANable:
   #
   
   
-  def startCANable(self, port="auto", bitrate=250000):
+  def startCANable(self, port="can0", bitrate=250000):
    # if port == "auto":
     #  print("Finding serial port")
      # port = "/dev/CAN"
@@ -61,7 +50,7 @@ class TychoCANable:
     
     print("Connecting to serial port '%s'"%port)
     #self.dev = cantact.CantactDev( port ) # just opens the serial port
-    self.dev = socketcan.SocketCanDev("can0")
+    self.dev = socketcan.SocketCanDev( port )
     
     #print("Setting bitrate to 250k")
     #self.dev.set_bitrate(250000) # 250,000 = s5
@@ -124,8 +113,7 @@ class TychoCANable:
   
   def buildSetVariable(self, dest, var_id, data):
     # TODO: Check for overflow when fixing inputs
-    if not isinstance(int1, int): int1 = int(round(int1))
-    if not isinstance(int2, int): int2 = int(round(int2))
+    if not isinstance(data, int): data = int(round(data))
     
     # Frame ID is 0x600 + node ID
     header = (0x600)|dest
@@ -197,21 +185,67 @@ class TychoCANable:
 
 
 def updatePID(p,i,d):
-    # Trying broadcast frames
-    canable.sendFrame(canable.buildSetVariable(0, 18, p))
-    canable.sendFrame(canable.buildSetVariable(0, 19, i))
-    canable.sendFrame(canable.buildSetVariable(0, 20, d))
-    canable.sendFrame(canable.buildSetVariable(0, 21, 1)) # Alert the controller to the change
+    print("Sending new PID values %f %f %f"%(p,i,d))
+    
+    for i in (1,2,3,4):
+        canable.sendFrame(canable.buildRPDO(i, 3, int(p*10), int(i*10) ))
+        canable.sendFrame(canable.buildRPDO(i, 4, int(d*10), 1         ))
+        #canable.sendFrame(canable.buildSetVariable(i, 18, int(p*10) ))
+        #canable.sendFrame(canable.buildSetVariable(i, 19, int(i*10) ))
+        #canable.sendFrame(canable.buildSetVariable(i, 20, int(d*10) ))
+        #canable.sendFrame(canable.buildSetVariable(i, 21, 1)) # Alert the controller to the change
+#
+def pid_callback(m):
+    updatePID(m.data[0], m.data[1], m.data[2])
+    return
+    
+    
+    # Highest user variable I can actually write to is 16 (0x10)
+    # The same variables the RPDOs and TPDOs write to.
+    # Guess I'll need to use RPDOs 3 and 4 for PID editing for now.
+    for var in (0x01, 0x10, 0x11):
+        pid_test(var, int(m.data[0]))
+#
+def pid_test(var, val):
+    print("Sending PID Update")
+    
+    frame = canable.buildRawCommand(2, 0x600, 8, [0x20,0x05,0x20,var,val,0x00,0x00,0x00])
+    canable.sendFrame(frame)
+    print (frame.id, frame.data)
+    # To assemble other commands
+    # [byte0,index2,index1,sub, data1,data2,data3,data4]
+    #  Index |   Sub    |         Entry Name         | Size | Access | Command
+    # 0x2003 | 01 to ee | Set Encoder Counter        | S32  |   WO   | C
+    # canable.buildRawCommand(2, 0x600, 8, [0x20,0x03,0x20,0x02,0x0A,0x00,0x00,0x00]) # Works
+    # 0x2106 | 01 to vv | Read User Integer Variable | S32  |   RO   | VAR
+    # 0x2005 | 01 to vv | Set User Integer Variable  | S32  |   WO   | VAR
+    
+    frame = canable.buildRawCommand(2, 0x600, 8, [0x40,0x06,0x21,var,0x00,0x00,0x00,0x00])
+    canable.sendFrame(frame)
+    print (frame.id, frame.data)
+    
+    #setEncFrame = canable.buildRawCommand(2, 0x600, 8, [0x20,0x03,0x20,0x02,0x0B,0x00,0x00,0x00])
+    #canable.sendFrame(setEncFrame)
+    #print (setEncFrame.id, setEncFrame.data)
+    
+    #frame = canable.buildRawCommand(2, 0x600, 8, [0x40,0x04,0x21,0x02,0x00,0x00,0x00,0x00])
+    #canable.sendFrame(frame)
+    #print (frame.id, frame.data)
 #
 
 def sendHeartbeat(event):
-    # Trying broadcast frames
     # TODO: Change the 400 to read MC_Speed_Scale from ROS params file
-    canable.sendFrame(canable.buildRPDO(0, 4, 400, 1))
+    canable.sendFrame(canable.buildRPDO(1, 2, 400, 1))
+    canable.sendFrame(canable.buildRPDO(2, 2, 400, 1))
+    canable.sendFrame(canable.buildRPDO(3, 2, 400, 1))
+    canable.sendFrame(canable.buildRPDO(4, 2, 400, 1))
 #
 
 def sendESTOP():
-    canable.sendFrame(canable.buildRawCommand(0, 0x600, 8, [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]))
+    for i in (1,2,3,4):
+        canable.sendFrame(canable.buildRawCommand(i, 0x600, 8, [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]))
+    # Broadcast frame don't work
+    #canable.sendFrame(canable.buildRawCommand(0, 0x600, 8, [0x2C,0x0C,0x20,0x00,0x01,0x00,0x00,0x00]))
 #
 
 def clearESTOP(node):
@@ -221,37 +255,37 @@ def clearESTOP(node):
 
 
 def new_command_callback(data):
-    print("Recieved command: %.2f mm/s at %.1f deg"%(data.back_left_speed, data.back_left_angle))
+    # print("Recieved command: %.2f mm/s at %.1f deg"%(data.back_left_speed, data.back_left_angle))
     canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(frontRightID, 1, round(data.front_right_speed * speedMultiplier), round( data.front_right_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(backLeftID, 1, round(data.back_left_speed * speedMultiplier), round(data.back_left_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(backRightID, 1, round(data.back_right_speed * speedMultiplier), round(data.back_right_angle * angleMultiplier)))
 #
 
-# TODO: Scale these values
+# TODO: Verify value scaling
 def handleTPDO(index, node, data1, data2):
 	if index == 1: # TPDO1: RMP 1, Amps 1
-		wheel_statuses[node].drive_rpm = data1
-		wheel_statuses[node].drive_amps = data2
+		wheel_statuses[node].drive_rpm = data1 # TODO: convert to rpm or to m/s
+		wheel_statuses[node].drive_amps = abs(data2)
 		ready_to_send[node] |= 0x1
 	elif index == 2: # TPDO2: Count 1, MCU Temp
 		wheel_statuses[node].drive_spin_count = data1
-		wheel_statuses[node].controller_temp = data2
+		wheel_statuses[node].controller_temp = data2 / 10.0
 		ready_to_send[node] |= 0x2
 	elif index == 3: # TPDO3: Angle 2, Amps 2
-		wheel_statuses[node].steering_angle = data1
-		wheel_statuses[node].steering_amps = data2
+		wheel_statuses[node].steering_angle = data1 / 10.0
+		wheel_statuses[node].steering_amps = abs(data2)
 		ready_to_send[node] |= 0x4
 	elif index == 4: # TPDO4: Temp 1, Temp 2
-		wheel_statuses[node].drive_temp = data1
-		wheel_statuses[node].steering_temp = data2
+		wheel_statuses[node].drive_temp = data1 / 10.0
+		wheel_statuses[node].steering_temp = data2 / 10.0
 		ready_to_send[node] |= 0x8
 	else:
 		return # TODO: Throw an error
 	#
 	
 	if ready_to_send[node] == 0xF:
-		print("Publishing % 5d % 5d % 5d % 5d % 5d % 5d % 5d % 5d"%(wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
+		#print("Publishing %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
 		statuspub.publish(wheel_statuses[node])
 		ready_to_send[node] = 0x0
 	#
@@ -277,6 +311,9 @@ rospy.init_node('CAN_Handler')
 print("Subscribing to topic")
 # Subscribe to low-level commands topic
 rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_callback, queue_size=1)
+
+# Subscribe to PID update topic
+rospy.Subscriber("tycho/pid", Float32MultiArray, pid_callback, queue_size=1)
     
 # Publish topic with current wheel sensor statuses
 # TODO: Maybe break this up into a couple of topics?
@@ -326,24 +363,24 @@ while not rospy.is_shutdown():
     handleTPDO(index, node, data1, data2)
   elif packet_type == PacketTypes.heartbeat:
     node = canable.readHeartbeat(f)
-    print("Heartbeat ", node)
+    #print("Heartbeat ", node)
     lastHeartbeat[node] = now
   else: # Unknwon packet type
-    pass
-    #print "%03X"%f.id, f.data
+    #pass
+    print("%03X"%f.id, f.data)
   #
   
   # Check heartbeats
   for i in (1,2,3,4):
     if now - lastHeartbeat[i] > maxHeartbeatDelay:
       # TODO: Send estop if a controller is lost!
-      rospy.logwarn("Lost controller %d!", i)
+      rospy.logwarn("Lost controller %d!"%i)
       # sendESTOP()
     #
   #
   rate.sleep()
 #
 
-
-canable.stop()
+# Not needed for socketcan?
+#canable.stop()
 
