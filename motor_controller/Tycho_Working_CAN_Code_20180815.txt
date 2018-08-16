@@ -1,0 +1,204 @@
+' Advanced CAN test
+' confirmed 20180629
+
+' NOTE: All #defines must come before any line of code
+#define STEER_BRAKE_PIN 2
+#define DRIVE_BRAKE_PIN 1
+#define BRAKES_ON _D0
+#define BRAKES_OFF _D1
+#define DRIVE_CHANNEL 1
+#define STEER_CHANNEL 2
+
+#define DRIVE_TEMP_INPUT 4
+#define STEER_TEMP_INPUT 5
+
+' empirically derived
+' Should be ~2.45m/rev, 
+#define SPEED_SCALE_FACTOR 40
+
+'''''''''''''
+' CAN SETUP '
+'''''''''''''
+
+' CAN input variables
+#define COMMANDED_SPEED_VAR 9
+#define COMMANDED_ANGLE_VAR 10
+#define SPEED_SCALE_FACTOR_INPUT_VAR 11
+#define MASTER_IS_ALIVE_VAR 12
+
+#define PID_P 18
+#define PID_I 19
+#define PID_D 20
+#define NEW_PID 21
+
+
+#define DATA_SEND_RATE 200
+#define WATCHDOG_TIMEOUT 500
+#define REPORT_TIMER 1
+#define WATCHDOG_TIMER 2
+
+SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+
+
+SetConfig(_CAS, 1)       ' Autostart CANopen on boot (does not work?)
+SetConfig(_CEN, 2)       ' Start miniCAN 
+wait(10)
+' FIXME: This is a dirty hack, I think I actually need an activation packet on the CAN BUS
+SetConfig(_CEN, 1)       ' Start CANopen
+SetConfig(_CTPS, 1, DATA_SEND_RATE) ' Send VAR1,2 every X ms
+SetConfig(_CTPS, 2, DATA_SEND_RATE) ' Send VAR3,4 every X ms
+SetConfig(_CTPS, 3, DATA_SEND_RATE) ' Send VAR5,6 every X ms
+SetConfig(_CTPS, 4, DATA_SEND_RATE) ' Send VAR7,8 every X ms
+SetConfig(_CHB,     DATA_SEND_RATE) ' Send heartbeat every X ms
+
+''''''''''''''''''''''''''''
+' INITIALIZE COMMUNICATION '
+''''''''''''''''''''''''''''
+
+' INSERT BOOTUP CODE HERE
+
+' there is apparently a CANOpen "start" command?
+' Not documented in the manual...
+
+Current_Drive_Speed = 0
+
+
+' Wait for confirmation that CAN bus is running
+GoSub SafeUntilSignal
+
+
+'''''''''''''
+' MAIN LOOP '
+'''''''''''''
+
+x = 1
+' The following get/set commands are from some RoboTeq example code
+top:
+    ' RPDOs are now being recieved properly
+    commanded_speed = getvalue(_VAR, COMMANDED_SPEED_VAR) ' in mm/s, caps at ~4200
+    commanded_speed_scaled = commanded_speed              ' from mm/s to 
+	if abs(commanded_speed_scaled) > 1000 then
+		commanded_speed_scaled = 1000 * commanded_speed_scaled/abs(commanded_speed_scaled)
+	end if
+    commanded_angle = getvalue(_VAR, COMMANDED_ANGLE_VAR) ' in tenthdegrees (range -900, +900)
+    commanded_angle_scaled = commanded_angle * 10 / 9     ' from tenthdegrees to +/-1000
+    
+    'commanded_speed = 0
+
+    ' tends to lose tracking at low speeds
+    Current_Steering_Speed = GetValue(_ABSPEED, 1) ' Should be in RPM (*10?)
+    Current_Steering_Angle = GetValue(_F, 1)*9/10   ' Reports value from -1000 to +1000, so this is tenthdegrees
+
+    Final_Drive_Speed = commanded_speed ' - Current_Steering_Speed * SPEED_SCALE_FACTOR / 10
+    
+	
+	
+	print("got command ", commanded_speed, " ", commanded_angle," ")
+	
+	print("-> ", Final_Drive_Speed, " ", commanded_angle_scaled,"\n")
+	
+	
+	If abs(Final_Drive_Speed) < 10 Then
+        SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+    Else 
+        SetCommand(BRAKES_OFF, DRIVE_BRAKE_PIN)
+    End If
+    SetCommand(_G, 1, Final_Drive_Speed)
+    
+    If abs(commanded_angle - Current_Steering_Angle) < 10 Then ' approx. 
+        SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+    Else 
+        SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)
+    End If
+    SetCommand(_G, STEER_CHANNEL, commanded_angle_scaled)
+	x = getvalue(_VAR, NEW_PID)
+print("NEW PID ", x,"\n")
+    ' Check for PID updates:
+    If getvalue(_VAR, NEW_PID) = 1 Then
+        SetCommand(_ESTOP, 1)
+		print("NEW PID ", getvalue(_VAR, PID_P), " ", getvalue(_VAR, PID_I), " ", getvalue(_VAR, PID_D),"\n")
+   '   setconfig(_KP, STEER_CHANNEL, getvalue(_VAR, PID_P))
+   '   setconfig(_KI, STEER_CHANNEL, getvalue(_VAR, PID_I))
+   '   setconfig(_KD, STEER_CHANNEL, getvalue(_VAR, PID_D))
+        SetCommand(_VAR, NEW_PID, 0)
+    End If
+	
+	
+    ' Check for master heartbeat
+    If getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 1 Then
+        SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+        SetCommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+    ElseIf GetTimerState(WATCHDOG_TIMER) = 1 Then
+        GoSub SafeUntilSignal
+    End If
+	
+    ' Set report variables
+    If GetTimerState(REPORT_TIMER) = 1 Then
+        GoSub ReportParameters
+        SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+    End If
+    wait(10)
+GoTo top
+
+
+' Parameter-reporting subroutine
+ReportParametersFAKE:
+    SetCommand(_VAR, 1, commanded_speed)
+    SetCommand(_VAR, 2, commanded_angle)
+    SetCommand(_VAR, 3, x)
+    SetCommand(_VAR, 4, commanded_angle_scaled)
+    SetCommand(_VAR, 5, Current_Steering_Speed)
+    SetCommand(_VAR, 6, Current_Steering_Angle)
+    SetCommand(_VAR, 7, Final_Drive_Speed)
+    SetCommand(_VAR, 8, x)
+Return
+
+
+' Parameter-reporting subroutine
+ReportParameters:
+    setcommand(_VAR, 1,  Final_Drive_Speed) ' getValue(_ABSPEED, 2) ) '[motor rpm 1])
+    setcommand(_VAR, 2,  getValue(_MOTAMPS, DRIVE_CHANNEL) ) '[motor amps 1])
+    setcommand(_VAR, 3,  getValue(_FEEDBK, DRIVE_CHANNEL) ) '[motor (incremental) step count 1])
+	' TODO: Reset feedback count?
+    setcommand(_VAR, 4,  Current_Steering_Speed) 'getValue(_TEMP, 1) )'[MCU Temp])
+    setcommand(_VAR, 5,  Current_Steering_Angle) '[motor angle 2])
+    setcommand(_VAR, 6,  commanded_angle_scaled) 'getValue(_MOTAMPS, 2) )'[motor amps 2]) ' Could totally combine the amps as 16-bit ints
+    setcommand(_VAR, 7,  getValue(_AI, DRIVE_TEMP_INPUT) ) ' Could probably combine these temps as 16-bit unsigned ints
+    setcommand(_VAR, 8,  getValue(_AI, STEER_TEMP_INPUT) )
+Return
+
+
+' safe-until-signal subroutine
+SafeUntilSignal:
+
+	print("Lost master!\n")
+    ' Clear the flag that set by the NUC's "heartbeat" RPDO
+    setcommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+    
+    ' Stop motors
+    setcommand(_MSTOP, DRIVE_CHANNEL) ' "Stop in all modes"
+    setcommand(_MSTOP, STEER_CHANNEL)
+    
+	wait(10)
+	
+    ' Wait until both are stopped before signaling brakes
+	' FIXME: THese loops block forever
+    'While GetConfig(_S, STEER_CHANNEL) <> 0 ' Steering speed (will probably hit 0 first)
+    '    wait(1)
+    'End While
+    SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+    
+    'While GetConfig(_S, DRIVE_CHANNEL) <> 0 ' Driving speed
+    '    wait(1)
+    'End While
+    SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+    
+    ' Wait for a signal
+	print("Waiting for master heartbeat...\n")
+    While getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 0
+        wait(1)
+    End While
+	print("Found master!\n")
+    
+    SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+Return
