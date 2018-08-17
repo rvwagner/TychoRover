@@ -6,7 +6,7 @@
         <Nodes>
           <Node Text="Scripting">
             <Nodes>
-              <Node Text="Script Auto-Start" Value="0">
+              <Node Text="Script Auto-Start" Value="1">
                 <Nodes />
               </Node>
             </Nodes>
@@ -97,10 +97,10 @@
           <Node Text="CAN Mode" Value="1">
             <Nodes />
           </Node>
-          <Node Text="Bit Rate" Value="3">
+          <Node Text="Bit Rate" Value="2">
             <Nodes />
           </Node>
-          <Node Text="Node ID" Value="4">
+          <Node Text="Node ID" Value="2">
             <Nodes />
           </Node>
           <Node Text="Listen Node ID" Value="0">
@@ -128,6 +128,22 @@
               </Node>
             </Nodes>
           </Node>
+          <Node Text="CANOpen Transmission Type">
+            <Nodes>
+              <Node Text="TPDO 1 Transmission Type" Value="255">
+                <Nodes />
+              </Node>
+              <Node Text="TPDO 2 Transmission Type" Value="255">
+                <Nodes />
+              </Node>
+              <Node Text="TPDO 3 Transmission Type" Value="255">
+                <Nodes />
+              </Node>
+              <Node Text="TPDO 4 Transmission Type" Value="255">
+                <Nodes />
+              </Node>
+            </Nodes>
+          </Node>
           <Node Text="CANOpen Autostart" Value="1">
             <Nodes />
           </Node>
@@ -137,10 +153,10 @@
         <Nodes>
           <Node Text="Encoder 1">
             <Nodes>
-              <Node Text="Use" Value="34">
+              <Node Text="Use" Value="18">
                 <Nodes />
               </Node>
-              <Node Text="Pulses/Rev" Value="5000">
+              <Node Text="Pulses/Rev" Value="4878">
                 <Nodes />
               </Node>
               <Node Text="Min Limit" Value="-10000">
@@ -162,16 +178,16 @@
           </Node>
           <Node Text="Encoder 2">
             <Nodes>
-              <Node Text="Use" Value="18">
+              <Node Text="Use" Value="34">
                 <Nodes />
               </Node>
               <Node Text="Pulses/Rev" Value="5000">
                 <Nodes />
               </Node>
-              <Node Text="Min Limit" Value="-20000">
+              <Node Text="Min Limit" Value="-10000">
                 <Nodes />
               </Node>
-              <Node Text="Max Limit" Value="20000">
+              <Node Text="Max Limit" Value="10000">
                 <Nodes />
               </Node>
               <Node Text="Home Count" Value="0">
@@ -204,7 +220,7 @@
               <Node Text="Active Level" Value="0">
                 <Nodes />
               </Node>
-              <Node Text="Action" Value="0">
+              <Node Text="Action" Value="32">
                 <Nodes />
               </Node>
             </Nodes>
@@ -214,7 +230,7 @@
               <Node Text="Active Level" Value="0">
                 <Nodes />
               </Node>
-              <Node Text="Action" Value="36">
+              <Node Text="Action" Value="32">
                 <Nodes />
               </Node>
             </Nodes>
@@ -234,7 +250,7 @@
               <Node Text="Active Level" Value="0">
                 <Nodes />
               </Node>
-              <Node Text="Action" Value="37">
+              <Node Text="Action" Value="32">
                 <Nodes />
               </Node>
             </Nodes>
@@ -717,7 +733,7 @@
           </Node>
           <Node Text="Voltage Limits">
             <Nodes>
-              <Node Text="Over Voltage Limit (V)" Value="550">
+              <Node Text="Over Voltage Limit (V)" Value="600">
                 <Nodes />
               </Node>
               <Node Text="Over Voltage Hysteresis (V)" Value="50">
@@ -740,7 +756,7 @@
         <Nodes>
           <Node Text="Motor Configuration">
             <Nodes>
-              <Node Text="Motor Direction" Value="0">
+              <Node Text="Motor Direction" Value="1">
                 <Nodes />
               </Node>
               <Node Text="Stall Detection" Value="2">
@@ -750,7 +766,7 @@
           </Node>
           <Node Text="Amps Limits">
             <Nodes>
-              <Node Text="Amps Limit (A)" Value="250">
+              <Node Text="Amps Limit (A)" Value="500">
                 <Nodes />
               </Node>
               <Node Text="Amps Trigger (A)" Value="200">
@@ -776,7 +792,7 @@
           </Node>
           <Node Text="Speed &amp;amp; Acceleration">
             <Nodes>
-              <Node Text="Max Speed (RPM)" Value="1000">
+              <Node Text="Max Speed (RPM)" Value="60">
                 <Nodes />
               </Node>
               <Node Text="Acceleration (RPM/s)" Value="20000">
@@ -787,15 +803,15 @@
               </Node>
             </Nodes>
           </Node>
-          <Node Text="Operating Mode" Value="0">
+          <Node Text="Operating Mode" Value="1">
             <Nodes />
           </Node>
           <Node Text="Closed Loop Parameters">
             <Nodes>
-              <Node Text="Position Mode Velocity (RPM)" Value="800">
+              <Node Text="Position Mode Velocity (RPM)" Value="50">
                 <Nodes />
               </Node>
-              <Node Text="Position Turns Min to Max" Value="10000">
+              <Node Text="Position Turns Min to Max" Value="102">
                 <Nodes />
               </Node>
               <Node Text="Proportional Gain" Value="20">
@@ -831,7 +847,7 @@
           </Node>
           <Node Text="Amps Limits">
             <Nodes>
-              <Node Text="Amps Limit (A)" Value="500">
+              <Node Text="Amps Limit (A)" Value="250">
                 <Nodes />
               </Node>
               <Node Text="Amps Trigger (A)" Value="200">
@@ -873,13 +889,13 @@
           </Node>
           <Node Text="Closed Loop Parameters">
             <Nodes>
-              <Node Text="Position Mode Velocity (RPM)" Value="1000">
+              <Node Text="Position Mode Velocity (RPM)" Value="50">
                 <Nodes />
               </Node>
-              <Node Text="Position Turns Min to Max" Value="4000">
+              <Node Text="Position Turns Min to Max" Value="100">
                 <Nodes />
               </Node>
-              <Node Text="Proportional Gain" Value="40">
+              <Node Text="Proportional Gain" Value="30">
                 <Nodes />
               </Node>
               <Node Text="Integral Gain" Value="1">
