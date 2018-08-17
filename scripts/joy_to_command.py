@@ -24,6 +24,8 @@ TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
 TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE = 1.5
 TYCHO_CSTRAFE_ADJUST_RATE = 0.75
 
+NORMAL_JOYX_DEADZONE = 0.1 # In normal mode, joystick must move this much from [current position] to register as a change
+
 class DriveMode(Enum):
     STOP = 0
     NORMAL = 1
@@ -97,6 +99,10 @@ class JoyToCommand:
                 newdata = data.axes[ self.buttonMap[key] ]
             else:
                 newdata = (data.buttons[ self.buttonMap[key] ] == 1)
+            #
+            # Extra deadzone for the steering axis in normal drive mode
+            if self.steeringMode == DriveMode.NORMAL and key == "joyXAxis" and newdata != 0 and abs(newdata - self.joyState[key]) < NORMAL_JOYX_DEADZONE):
+                return False
             #
             if self.joyState[key] != newdata:
                 self.joyState[key] = newdata
