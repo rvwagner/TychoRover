@@ -187,9 +187,9 @@ class TychoCANable:
 def updatePID(p,i,d):
     print("Sending new PID values %f %f %f"%(p,i,d))
     
-    for i in (1,2,3,4):
-        canable.sendFrame(canable.buildRPDO(i, 3, int(p*10), int(i*10) ))
-        canable.sendFrame(canable.buildRPDO(i, 4, int(d*10), 1         ))
+    for motorID in (1,2,3,4):
+        canable.sendFrame(canable.buildRPDO(motorID, 3, int(p*10), int(i*10) ))
+        canable.sendFrame(canable.buildRPDO(motorID, 4, int(d*10), 2         ))
         #canable.sendFrame(canable.buildSetVariable(i, 18, int(p*10) ))
         #canable.sendFrame(canable.buildSetVariable(i, 19, int(i*10) ))
         #canable.sendFrame(canable.buildSetVariable(i, 20, int(d*10) ))
@@ -266,7 +266,7 @@ def new_command_callback(data):
 def handleTPDO(index, node, data1, data2):
 	if index == 1: # TPDO1: RMP 1, Amps 1
 		wheel_statuses[node].drive_rpm = data1 # TODO: convert to rpm or to m/s
-		wheel_statuses[node].drive_amps = abs(data2)
+		wheel_statuses[node].drive_amps = abs(data2) / 10.0
 		ready_to_send[node] |= 0x1
 	elif index == 2: # TPDO2: Count 1, MCU Temp
 		wheel_statuses[node].drive_spin_count = data1
@@ -274,7 +274,7 @@ def handleTPDO(index, node, data1, data2):
 		ready_to_send[node] |= 0x2
 	elif index == 3: # TPDO3: Angle 2, Amps 2
 		wheel_statuses[node].steering_angle = data1 / 10.0
-		wheel_statuses[node].steering_amps = abs(data2)
+		wheel_statuses[node].steering_amps = abs(data2) / 10.0
 		ready_to_send[node] |= 0x4
 	elif index == 4: # TPDO4: Temp 1, Temp 2
 		wheel_statuses[node].drive_temp = data1 / 10.0
