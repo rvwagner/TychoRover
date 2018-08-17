@@ -1,0 +1,290 @@
+' Advanced CAN code
+' Working in challenge mode now: must keep hex code below 1k, or we need to pay $500 for a license code
+' Minimize serial communication
+
+' NOTE: All #defines must come before any line of code
+#define STEER_BRAKE_PIN 2
+#define DRIVE_BRAKE_PIN 1
+#define BRAKES_ON _D0
+#define BRAKES_OFF _D1
+#define DRIVE_CHANNEL 1
+#define STEER_CHANNEL 2
+
+#define DRIVE_TEMP_INPUT 4
+#define STEER_TEMP_INPUT 5
+
+#define OUTER_LIMIT_INPUT 3
+
+' empirically derived
+' Should be ~2.45m/rev, 
+#define SPEED_SCALE_FACTOR 1
+
+'''''''''''''
+' CAN SETUP '
+'''''''''''''
+
+' CAN input variables
+#define COMMANDED_SPEED_VAR 9
+#define COMMANDED_ANGLE_VAR 10
+#define SPEED_SCALE_FACTOR_INPUT_VAR 11
+#define MASTER_IS_ALIVE_VAR 12
+
+#define AUX1_VAR 13
+#define AUX2_VAR 14
+#define AUX3_VAR 15
+#define NEW_AUX 16
+
+
+#define DATA_SEND_RATE 200
+#define WATCHDOG_TIMEOUT 500
+#define REPORT_TIMER 1
+#define WATCHDOG_TIMER 2
+
+SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+
+
+SetConfig(_CAS, 1)       ' Autostart CANopen on boot (does not work?)
+SetConfig(_CEN, 2)       ' Start miniCAN 
+wait(10)
+' FIXME: This is a dirty hack, I think I actually need an activation packet on the CAN BUS
+' In theory these lines duplicate pre-set config values
+SetConfig(_CEN, 1)       ' Start CANopen
+SetConfig(_CTPS, 1, DATA_SEND_RATE) ' Send VAR1,2 every X ms
+SetConfig(_CTPS, 2, DATA_SEND_RATE) ' Send VAR3,4 every X ms
+SetConfig(_CTPS, 3, DATA_SEND_RATE) ' Send VAR5,6 every X ms
+SetConfig(_CTPS, 4, DATA_SEND_RATE) ' Send VAR7,8 every X ms
+SetConfig(_CHB,     DATA_SEND_RATE) ' Send heartbeat every X ms
+
+''''''''''''''''''''''''''''
+' INITIALIZE COMMUNICATION '
+''''''''''''''''''''''''''''
+
+Current_Drive_Speed = 0
+Wheels_Are_Initialized = 0
+
+motor_id = getconfig(_CNOD)
+If (motor_id = 1) or (motor_id = 3) Then ' Left-side
+	is_left = 1
+Else
+	is_left = -1
+End If
+
+
+' Wait for confirmation that CAN bus is running
+GoSub SafeUntilSignal
+
+
+
+
+'''''''''''''
+' MAIN LOOP '
+'''''''''''''
+
+' The following get/set commands are from some RoboTeq example code
+top:
+	' Check for new PID, wheel init, etc.:
+	If getvalue(_VAR, NEW_AUX) <> 0 Then
+		GoSub UpdateAuxValues
+	End If
+	
+	' Check for master heartbeat
+	If getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 1 Then
+		SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+		SetCommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+	ElseIf GetTimerState(WATCHDOG_TIMER) = 1 Then
+		GoSub SafeUntilSignal
+	End If
+
+	' Set report variables
+	If GetTimerState(REPORT_TIMER) = 1 Then
+		GoSub ReportParameters
+		SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+	End If
+	
+'	If Wheels_Are_Initialized = 0 Then
+'		GoTo top
+'	End If
+	
+	'''''''''''''''''''''''''''
+	' Handle driving commands '
+	'''''''''''''''''''''''''''
+	
+	' Read command RPDO
+	' TODO: Merge the read and conversion lines
+	commanded_speed = getvalue(_VAR, COMMANDED_SPEED_VAR) ' in mm/s, caps at ~4200
+	commanded_speed_scaled = commanded_speed              ' from mm/s to 
+	If commanded_speed_scaled > 1000 Then
+		commanded_speed_scaled = 1000
+	ElseIf commanded_speed_scaled < -1000 Then
+		commanded_speed_scaled = -1000
+	End If
+	
+	commanded_angle = getvalue(_VAR, COMMANDED_ANGLE_VAR) ' in tenthdegrees (range -900, +900)
+	commanded_angle_scaled = commanded_angle * 10 / 9     ' from tenthdegrees to +/-1000
+	If commanded_angle_scaled > 1000 Then
+		commanded_angle_scaled = 1000
+	ElseIf commanded_angle_scaled < -1000 Then
+		commanded_angle_scaled = -1000
+	End If
+	
+	
+	' Check/update steering target
+	Current_Steering_Angle = GetValue(_FEEDBK, STEER_CHANNEL)  ' Reports value from -1000 to +1000
+	
+	If abs(commanded_angle - Current_Steering_Angle) < 10 Then 
+		SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+		SetCommand(_MSTOP, STEER_CHANNEL)
+		Final_Drive_Speed = commanded_speed ' No drive compensation
+	Else 
+		SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)
+		SetCommand(_GO, STEER_CHANNEL, commanded_angle_scaled)
+		
+		' If steering motor not parked, add compensation to drive speed
+		' FIXME: Do this pre-scaling?
+		' Current_Steering_Speed = GetValue(_ABSPEED, STEER_CHANNEL) ' Should be in RPM (*10?) ' Falsely assumed that I can *get* a speed...
+		Current_Steering_Power = GetValue(_MOTPWR, STEER_CHANNEL) ' In decipercent, -1k to +1k
+		' Final_Drive_Speed = commanded_speed - (commanded_angle - Current_Steering_Angle)/abs(commanded_angle - Current_Steering_Angle) * 1000 * is_left
+		' getvalue(_MOTCMD, 2)
+		'  _LPERR may be good
+		Final_Drive_Speed = commanded_speed - Current_Steering_Power / SPEED_SCALE_FACTOR ' FIXME: Sign error?
+	End If
+	
+	
+	
+	' Quick-and-dirty feedback, breaks RoboRun's data viewing
+	'print("CAN: ", commanded_speed, " ", commanded_angle," (", Current_Steering_Power, " ", Current_Steering_Angle,") -> ", Final_Drive_Speed, " ", commanded_angle_scaled,"\n")
+
+	' Drive or stop, as needed
+	If abs(Final_Drive_Speed) < 20 Then
+		SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+		SetCommand(_MSTOP, DRIVE_CHANNEL)
+	Else 
+		SetCommand(BRAKES_OFF, DRIVE_BRAKE_PIN)
+		SetCommand(_GO, DRIVE_CHANNEL, Final_Drive_Speed)
+	End If
+	
+	wait(10)
+GoTo top
+
+
+' Subroutine to update values passed in from the master
+UpdateAuxValues:
+	update_mode = getvalue(_VAR, NEW_AUX)
+	If update_mode = 1 Then
+		' TODO: Remove these prints
+		print("NEW DRIVE PID ", getvalue(_VAR, AUX1_VAR), " ", getvalue(_VAR, AUX2_VAR), " ", getvalue(_VAR, AUX3_VAR),"\n")
+		'print("EXISTING STEER PID ", getconfig(_KP, 2), " ", getconfig(_KI, 2), " ", getconfig(_KD, 2),"\n")
+		x = getvalue(_VAR, AUX1_VAR)
+		setconfig(_KP, DRIVE_CHANNEL, x)
+		x = getvalue(_VAR, AUX2_VAR)
+		setconfig(_KI, DRIVE_CHANNEL, x)
+		x = getvalue(_VAR, AUX3_VAR)
+		setconfig(_KD, DRIVE_CHANNEL, x)
+		'print("UPDATED STEER PID ", getconfig(_KP, 2), " ", getconfig(_KI, 2), " ", getconfig(_KD, 2),"\n")
+	ElseIf update_mode = 2 Then
+		print("NEW STEER PID ", getvalue(_VAR, AUX1_VAR), " ", getvalue(_VAR, AUX2_VAR), " ", getvalue(_VAR, AUX3_VAR),"\n")
+		'print("EXISTING ", getconfig(_KP, 2), " ", getconfig(_KI, 2), " ", getconfig(_KD, 2),"\n")
+		' TODO: Can I do setconfig(_KP, STEER_CHANNEL, getvalue(_VAR, AUX1_VAR)) ?  It seemed to fail...
+		x = getvalue(_VAR, AUX1_VAR)
+		setconfig(_KP, STEER_CHANNEL, x)
+		x = getvalue(_VAR, AUX2_VAR)
+		setconfig(_KI, STEER_CHANNEL, x)
+		x = getvalue(_VAR, AUX3_VAR)
+		setconfig(_KD, STEER_CHANNEL, x)
+		'print("UPDATED ", getconfig(_KP, 2), " ", getconfig(_KI, 2), " ", getconfig(_KD, 2),"\n")
+	ElseIf update_mode = 3 Then
+		GoSub SetWheelRange
+	End If
+	SetCommand(_VAR, NEW_AUX, 0)
+Return
+
+' Parameter-reporting subroutine
+ReportParameters:
+	setcommand(_VAR, 1,  getValue(_ABSPEED, DRIVE_CHANNEL) ) ' motor rpm 1 (unknown units)
+	setcommand(_VAR, 2,  getValue(_MOTAMPS, DRIVE_CHANNEL) ) ' in 1/10 amps
+	setcommand(_VAR, 3,  getValue(_RELCNTR, DRIVE_CHANNEL) ) ' drive motor incremental step count (TODO: Convert to a physical unit?)
+	setcommand(_VAR, 4,  getValue(_TEMP, 1) )                ' MCU Temp (TODO: UNITS?)
+	setcommand(_VAR, 5,  Current_Steering_Angle*9/10)        ' Steer motor angle in 1/10 degrees
+	setcommand(_VAR, 6,  getValue(_MOTAMPS, STEER_CHANNEL) ) ' in 1/10 amps ' Could totally combine the amps as 16-bit ints
+	setcommand(_VAR, 7,  getValue(_AI, DRIVE_TEMP_INPUT) )   ' in 1/10 degree C ' Could probably combine these temps as 16-bit unsigned ints
+	setcommand(_VAR, 8,  getValue(_AI, STEER_TEMP_INPUT) )   ' in 1/10 degree C
+	' result = getvalue(_FF, 1) ' Fault flags for controller, 8-bit value
+	' Could also add motor channel flags and status flags for a 32-bit combo
+	' MOTPWR is also insteresting- actual PWM level applied to channel
+Return
+
+
+' safe-until-signal subroutine
+SafeUntilSignal:
+
+	print("Lost master!\n") ' TODO: Remove/simplify print statements
+	' Clear the flag that set by the NUC's "heartbeat" RPDO
+	setcommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+	
+	' Stop motors
+	setcommand(_MSTOP, DRIVE_CHANNEL) ' "Stop in all modes"
+	setcommand(_MSTOP, STEER_CHANNEL)
+	
+	wait(10)
+	
+	' Wait until both are stopped before signaling brakes
+	' FIXME: THese loops block forever
+	'While GetConfig(_S, STEER_CHANNEL) <> 0 ' Steering speed (will probably hit 0 first)
+	'    wait(1)
+	'End While
+	SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+	
+	'While GetConfig(_S, DRIVE_CHANNEL) <> 0 ' Driving speed
+	'    wait(1)
+	'End While
+	SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+	
+	' Wait for a signal
+	print("Waiting for master heartbeat...\n")
+	While getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 0
+		wait(1)
+	End While
+	print("Found master!\n")
+	
+	SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+Return
+
+
+' Macro to identify end of wheel range and set counter zero point accordingly
+SetWheelRange:
+	' Set direction to travel based on motor ID
+'	default_steer_speed = getconfig(_MVEL)
+'	move_sign = -is_left
+
+	' SLOWLY move wheel towards that direction until DIN 3 (the reliable one) is high
+	' DIN3 is the top limit connector on the octo board
+	' Save existing speed
+'	speed = 5
+'	offset = 400 * move_sign
+'	SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)' Disengage brakes
+'	print("Moving...\n")
+'	SetCommand(_MOTVEL, STEER_CHANNEL, speed) ' Make motor slow
+'	setcommand(_MPOSREL, STEER_CHANNEL, offset ) ' Move 
+'	While getvalue(_DIN, OUTER_LIMIT_INPUT) = 0
+		'If getvalue(_DREACHED, STEER_CHANNEL) = 1 Then
+		'	print("Moving\n")
+		'	setcommand(_MPOSREL, STEER_CHANNEL, offset ) ' Move 
+		'End If
+		wait(1)
+'	End While
+	' Stop wheel, maybe back off and click again even slower
+'	SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+'	setcommand(_MSTOP, STEER_CHANNEL)
+	' Disable motor
+'	setcommand(_MSTOP, STEER_CHANNEL)
+	' Set counter to +/-10000 depending on which side this is
+	' setcommand(_SENCNTR, STEER_CHANNEL, -10000)
+	' Command wheel to recenter
+	' Reset steering speed to existing speed
+	' setcommand(_MOTVEL, STEER_CHANNEL, default_steer_speed)
+'	while true
+'		wait (1)
+'	end while
+	Wheels_Are_Initialized = 1
+Return
+
