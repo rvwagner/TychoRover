@@ -24,7 +24,9 @@ TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
 TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE = 1.5
 TYCHO_CSTRAFE_ADJUST_RATE = 0.75
 
-NORMAL_JOYX_DEADZONE = 0.1 # In normal mode, joystick must move this much from [current position] to register as a change
+TYCHO_DRIVE_MODE_ACKERMANN = True
+
+NORMAL_JOYX_DEADZONE = 0.12 # In normal mode, joystick must move this much from [current position] to register as a change
 
 class DriveMode(Enum):
     STOP = 0
@@ -46,6 +48,7 @@ class JoyToCommand:
         
         self.steeringMode = DriveMode.STOP
         self.canReverse = True;
+        self.isAckermann = TYCHO_DRIVE_MODE_ACKERMANN
         self.lastNonZeroTime = rospy.Time.now() # Used for buttonless mode updater
         self.lastCStrafeUpdateTime = rospy.Time.now() # Used for getting the right change rate on circle-strafe mode
         self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
@@ -101,8 +104,11 @@ class JoyToCommand:
                 newdata = (data.buttons[ self.buttonMap[key] ] == 1)
             #
             # Extra deadzone for the steering axis in normal drive mode
-            if self.steeringMode == DriveMode.NORMAL and key == "joyXAxis" and newdata != 0 and abs(newdata - self.joyState[key]) < NORMAL_JOYX_DEADZONE):
+            if self.steeringMode == DriveMode.NORMAL and key == "joyXAxis" and newdata != 0 and abs(newdata - self.joyState[key]) < NORMAL_JOYX_DEADZONE:
                 return False
+            #
+            if self.steeringMode == DriveMode.NORMAL and key == "joyYAxis" and abs(newdata) < 0.1:
+                newdata = 0.0
             #
             if self.joyState[key] != newdata:
                 self.joyState[key] = newdata
@@ -224,7 +230,11 @@ class JoyToCommand:
     def interpretNormal(self):
         print('Using interpretNormal()')
         self.strafeAngle = 0
-        self.turnX = 0
+        #if self.isAckermann:
+        self.turnX = 0 #-1.33 # Correct value for Ackermann steering - in line with rear axle
+        #else:
+        #    self.turnX = 0
+        #
         self.isBraking = False
         
         # Set speed
