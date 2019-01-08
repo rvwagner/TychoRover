@@ -39,6 +39,9 @@ ros::NodeHandle nh;
 std_msgs::Int16 page_msg;
 ros::Publisher pagePub("tycho/gui_page", &page_msg);
 
+std_msgs::Int16 wheel_cal_msg;
+ros::Publisher wheelCal("tycho/align_wheel", &wheel_cal_msg);
+
 // joy message type has variable-length arrays that must be allocated and assigned separately
 // http://wiki.ros.org/rosserial/Overview/Messages
 sensor_msgs::Joy joy_msg;
@@ -115,6 +118,7 @@ void setup() {
   
   nh.initNode();
   nh.advertise(pagePub);
+  nh.advertise(wheelCal);
   nh.advertise(joyPub);
   nh.advertise(mousePub);
 

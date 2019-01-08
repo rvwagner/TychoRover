@@ -45,5 +45,5 @@
 	<include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
 
 	<!-- Mini-Tycho Arduino -->
-	<!-- <node name="serial_bridge_hood_ornament" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" /> -->
+	<node name="serial_bridge_hood_ornament" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" />
 </launch>

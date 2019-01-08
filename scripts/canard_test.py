@@ -10,6 +10,7 @@ import rospy
 from tycho.msg import WheelAnglesSpeeds
 from tycho.msg import WheelStatus
 from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Int16
 
 from enum import Enum
 import struct # For converting incoming packet data to ints
@@ -183,6 +184,16 @@ class TychoCANable:
   #
 # END CLASS
 
+def runWheelAlignment(m):
+    print("Sending new wheel alignment command")
+    print(m.data)
+    
+    # TODO: Stagger this... Put wheel ID in message?
+    #for motorID in (1,2,3,4):
+    # second value in RPDO 4 is Aux value type
+    # TODO: Make the AUX values an enum or dict
+    canable.sendFrame(canable.buildRPDO(m.data, 4, 0, 3)) 
+#
 
 def updatePID(p,i,d):
     print("Sending new PID values %f %f %f"%(p,i,d))
@@ -285,7 +296,7 @@ def handleTPDO(index, node, data1, data2):
 	#
 	
 	if ready_to_send[node] == 0xF:
-		#print("Publishing %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
+		print("Publishing %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
 		statuspub.publish(wheel_statuses[node])
 		ready_to_send[node] = 0x0
 	#
@@ -314,6 +325,9 @@ rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, new_command_
 
 # Subscribe to PID update topic
 rospy.Subscriber("tycho/pid", Float32MultiArray, pid_callback, queue_size=1)
+
+# Subscribe to PID update topic
+rospy.Subscriber("tycho/align_wheel", Int16, runWheelAlignment, queue_size=1)
     
 # Publish topic with current wheel sensor statuses
 # TODO: Maybe break this up into a couple of topics?
@@ -352,10 +366,6 @@ count = 0
 rate = rospy.Rate(100) # Hz
 print ("Starting main loop")
 while not rospy.is_shutdown():
-  #rate.sleep()
-  #continue
-  
-  
   f, packet_type = canable.receiveFrameWithType()
   # print(f, packet_type)
   if packet_type == PacketTypes.TPDO:

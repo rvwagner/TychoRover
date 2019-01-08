@@ -66,6 +66,54 @@ void exitMouseMode(){
   driveMode.forceButtonChange(stop_button_index);
 }
 
+void align_wheels(){
+  bool done_fl = false;
+  bool done_fr = false;
+  bool done_bl = false;
+  bool done_br = false;
+  
+  // Wait for buttons to be released
+  while (digitalRead(mode_u3) == LOW || digitalRead(mode_l3) == LOW) {
+#ifdef ROS
+   nh.spinOnce();
+#endif
+    flashModeButtons(2);
+    delay(1);
+  }
+  flashingButtons = B00011011; // flash only left four buttons
+
+  
+  
+  
+  while (digitalRead(mode_u3) != LOW && digitalRead(mode_l3) != LOW) {
+    if (digitalRead(mode_u1) == LOW){
+      wheel_cal_msg.data = 1; //flashingButtons &= B00011010;
+      wheelCal.publish( &wheel_cal_msg );
+      done_fl = true;
+    }
+    if (digitalRead(mode_u2) == LOW){
+      wheel_cal_msg.data = 2; //flashingButtons &= B00011001;
+      wheelCal.publish( &wheel_cal_msg );
+      done_fr = true;
+    }
+    if (digitalRead(mode_l1) == LOW){
+      wheel_cal_msg.data = 3; //flashingButtons &= B00010011;
+      wheelCal.publish( &wheel_cal_msg );
+      done_bl = true;
+    }
+    if (digitalRead(mode_l2) == LOW){
+      wheel_cal_msg.data = 4; //flashingButtons &= B00001011;
+      wheelCal.publish( &wheel_cal_msg );
+      done_br = true;
+    }
+    nh.spinOnce();
+    flashModeButtons(2);
+    delay(1);
+  }
+  
+  flashingButtons = B00111111; // flash all buttons
+}
+
 
 void calibrate_joystick(){
   // Wait for buttons to be released
@@ -111,7 +159,8 @@ void mouse_loop(){
   } else if (buttonDownCount == 2 && u2 && l2){
     // Deadzone adjust?
   } else if (buttonDownCount == 2 && u3 && l3){
-    // ???
+    // Align wheels
+    align_wheels();
   } else if (!mouseDown && buttonDownCount == 1){
     // Exactly one button: mouseclick
     valuesChanged = true;

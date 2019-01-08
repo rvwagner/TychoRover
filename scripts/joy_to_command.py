@@ -14,6 +14,7 @@ from math import atan2, sqrt, pi, atan
 # FIXME: Should load this from a parameter file
 # Max speed in mm/s
 TYCHO_MAX_SPEED = 1000.0
+TYCHO_MAX_FWD_SPEED = 2000.0 # Front-wheel-drive mode speed limit
 TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 1
 TYCHO_MAX_SPIN_SPEED = 1000.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
@@ -26,13 +27,14 @@ TYCHO_CSTRAFE_ADJUST_RATE = 0.75
 
 TYCHO_DRIVE_MODE_ACKERMANN = True
 
-NORMAL_JOYX_DEADZONE = 0.12 # In normal mode, joystick must move this much from [current position] to register as a change
+NORMAL_JOYX_DEADZONE = 0.20 # In normal mode, joystick must move this much from [current position] to register as a change
 
 class DriveMode(Enum):
     STOP = 0
     NORMAL = 1
     STRAFE = 2
     INPLACE = 3
+    FRONT_STEER = 4
     CIRCLESTRAFE = 5
 #
 
@@ -70,9 +72,10 @@ class JoyToCommand:
         self.buttonMap['buttonNormal']       = 5
         self.buttonMap['buttonStrafe']       = 1
         self.buttonMap['buttonCircleStrafe'] = 4
-        self.buttonMap['buttonReverse']      = 0
+#        self.buttonMap['buttonReverse']      = 0
         self.buttonMap['buttonTurnInPlace']  = 3
         self.buttonMap['buttonStop']         = 2
+        self.buttonMap['buttonFrontSteer']   = 0
         
         self.joyState = {}
         self.joyState['joyXAxis'] = 0.0
@@ -83,6 +86,7 @@ class JoyToCommand:
         self.joyState['buttonReverse']      = False
         self.joyState['buttonTurnInPlace']  = False
         self.joyState['buttonStop']         = False
+        self.joyState['buttonFrontSteer']   = False
         self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand, queue_size=1)
     #
     
@@ -124,9 +128,10 @@ class JoyToCommand:
         hasChanged = updateValueIfNeeded('joyYAxis', isAxis=True) or hasChanged
         hasChanged = updateValueIfNeeded('buttonStrafe') or hasChanged
         hasChanged = updateValueIfNeeded('buttonNormal') or hasChanged
-        hasChanged = updateValueIfNeeded('buttonReverse') or hasChanged
+#        hasChanged = updateValueIfNeeded('buttonReverse') or hasChanged
         hasChanged = updateValueIfNeeded('buttonTurnInPlace') or hasChanged
         hasChanged = updateValueIfNeeded('buttonCircleStrafe') or hasChanged
+        hasChanged = updateValueIfNeeded('buttonFrontSteer') or hasChanged
         
         # Ignore stop button release unless joystick is neutral
         if self.joyState['buttonStop'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
@@ -150,6 +155,8 @@ class JoyToCommand:
             self.steeringMode = DriveMode.STRAFE
         elif self.joyState['buttonTurnInPlace']:
             self.steeringMode = DriveMode.INPLACE
+        elif self.joyState['buttonFrontSteer']:
+            self.steeringMode = DriveMode.FRONT_STEER
         elif self.joyState['buttonCircleStrafe']:
             if self.steeringMode != DriveMode.CIRCLESTRAFE:
                 self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
@@ -207,6 +214,9 @@ class JoyToCommand:
         elif self.steeringMode == DriveMode.NORMAL:
             self.interpretNormal()
             
+        elif self.steeringMode == DriveMode.FRONT_STEER:
+            self.interpretNormal(True)
+            
         else:
             self.interpretStop()
         #
@@ -227,19 +237,21 @@ class JoyToCommand:
     
     
     # Drive like a normal car
-    def interpretNormal(self):
+    def interpretNormal(self, isAckermann=False):
         print('Using interpretNormal()')
         self.strafeAngle = 0
-        #if self.isAckermann:
-        self.turnX = 0 #-1.33 # Correct value for Ackermann steering - in line with rear axle
-        #else:
-        #    self.turnX = 0
+        if isAckermann:
+            self.turnX = -1.17 # Correct value for Ackermann steering - in line with rear axle
+            speedLimit = TYCHO_MAX_FWD_SPEED
+        else:
+            self.turnX = 0
+            speedLimit = TYCHO_MAX_SPEED
         #
         self.isBraking = False
         
         # Set speed
-        self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
-        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], TYCHO_MAX_SPEED, self.speed) )
+        self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], speedLimit)
+        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], speedLimit, self.speed) )
         
         # Set steering values depending on joystick left/right axis
         if (self.joyState['joyXAxis'] != 0.0):
@@ -272,6 +284,7 @@ class JoyToCommand:
         
         self.publishCommandMessage()
     #
+    
     
     # Drive straight in any direction
     def interpretStrafe(self):
