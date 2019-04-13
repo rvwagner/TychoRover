@@ -155,8 +155,8 @@ class CommandToAngles:
     # Changes speed multipliers based on joystick value and desired speed to do tank turning
     # Offical "desired speed" should be set to 1
     def setAnglesAndSpeedsTank(self, speed, turn_speed_adjust):
-        left_speed = speed + turn_speed_adjust
-        right_speed = speed - turn_speed_adjust
+        left_speed = speed - turn_speed_adjust
+        right_speed = speed + turn_speed_adjust
         if left_speed > self.maxWheelSpeed: left_speed = self.maxWheelSpeed
         if left_speed < -self.maxWheelSpeed: left_speed = -self.maxWheelSpeed
         if right_speed > self.maxWheelSpeed: right_speed = self.maxWheelSpeed

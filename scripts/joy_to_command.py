@@ -146,12 +146,12 @@ class JoyToCommand:
     def setBrakeLock(self, front_is_now_locked=False, back_is_now_locked=False):
         if is_now_locked:
             print("Locking front brakes")
-        else
+        else:
             print("Unlocking front brakes")
         #
         if is_now_locked:
             print("Locking rear brakes")
-        else
+        else:
             print("Unlocking rear brakes")
         #
     #
@@ -182,7 +182,7 @@ class JoyToCommand:
         elif self.steeringMode != DriveMode.STOP and self.joyState['buttonStop']:
             self.steeringMode = DriveMode.STOP
             changedMode = True
-        elif self.steeringMode != DriveMode.NORMAL:
+        elif self.steeringMode != DriveMode.NORMAL and not self.joyState['buttonStop'] and not self.joyState['buttonNormal'] and not self.joyState['buttonStrafe'] and not self.joyState['buttonTurnInPlace'] and not self.joyState['buttonFrontSteer'] and not self.joyState['buttonCircleStrafe']:
             self.steeringMode = DriveMode.NORMAL
             changedMode = True
         #
