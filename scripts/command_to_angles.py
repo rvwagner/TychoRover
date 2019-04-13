@@ -76,6 +76,18 @@ class CommandToAngles:
             return
         #
         
+        # FIXME: Horrible hack to activate tank steering mode
+        if data.is_strafing and data.strafing_angle == 720.0 and data.turn_center_x == 720.0:
+            if (data.speed != self.speed or data.turn_center_y != self.turnY):
+                self.speed = data.speed
+                self.turnY = data.turn_center_y
+                self.isStrafing = True
+                self.strafingAngle = 0.0
+                self.setAnglesAndSpeedsTank(self.speed, self.turnY)
+                self.createAndPublishCommandMessage()
+            return
+        #
+        
         if data.is_strafing:
             dataIsNew = (data.speed != self.speed or data.strafing_angle != self.strafingAngle) or not self.isStrafing
         else:
@@ -136,6 +148,28 @@ class CommandToAngles:
         #setVehicleSpeed(currentSpeed);
         
         return self.setSteeringAngles(angle, angle, angle, angle);
+    #
+    
+    
+    # Set the steering angle to put all wheels pointing forward
+    # Changes speed multipliers based on joystick value and desired speed to do tank turning
+    # Offical "desired speed" should be set to 1
+    def setAnglesAndSpeedsTank(self, speed, turn_speed_adjust):
+        left_speed = speed + turn_speed_adjust
+        right_speed = speed - turn_speed_adjust
+        if left_speed > self.maxWheelSpeed: left_speed = self.maxWheelSpeed
+        if left_speed < -self.maxWheelSpeed: left_speed = -self.maxWheelSpeed
+        if right_speed > self.maxWheelSpeed: right_speed = self.maxWheelSpeed
+        if right_speed < -self.maxWheelSpeed: right_speed = -self.maxWheelSpeed
+        
+        self.speedMultipliers['FrontLeft']  = left_speed
+        self.speedMultipliers['FrontRight'] = right_speed
+        self.speedMultipliers['BackLeft']   = left_speed
+        self.speedMultipliers['BackRight']  = right_speed
+        
+        time = self.setSteeringAngles(0, 0, 0, 0)
+        self.setVehicleSpeed(1.0)
+        return time
     #
     
     #// Commands the steering servos to go to appropriate angles for the vehicle to turn

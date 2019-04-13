@@ -19,6 +19,8 @@ TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 1
 TYCHO_MAX_SPIN_SPEED = 1000.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
+TANK_STEER_SPEED = 500.0 # Maximum speed adjustment for tank steering
+
 TYCHO_MINIMUM_TURN_RADIUS = 1
 
 TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
@@ -141,31 +143,52 @@ class JoyToCommand:
             self.interpretJoystick()
     #
     
+    def setBrakeLock(self, front_is_now_locked=False, back_is_now_locked=False):
+        if is_now_locked:
+            print("Locking front brakes")
+        else
+            print("Unlocking front brakes")
+        #
+        if is_now_locked:
+            print("Locking rear brakes")
+        else
+            print("Unlocking rear brakes")
+        #
+    #
+    
     def updateDriveMode(self):
         """
         Uses the current button state to set the self.steeringMode variable
         If multiple buttons are pressed, prioritizes them
         If no buttons are pressed, defaults to DriveMode.NORMAL
         """
-        if self.joyState['buttonStop']:
-            self.steeringMode = DriveMode.STOP
-        elif self.joyState['buttonNormal']:
-            self.steeringMode = DriveMode.NORMAL
-        elif self.joyState['buttonStrafe']:
-            self.steeringMode = DriveMode.STRAFE
-        elif self.joyState['buttonTurnInPlace']:
-            self.steeringMode = DriveMode.INPLACE
-        elif self.joyState['buttonFrontSteer']:
-            self.steeringMode = DriveMode.FRONT_STEER
-        elif self.joyState['buttonCircleStrafe']:
-            if self.steeringMode != DriveMode.CIRCLESTRAFE:
-                self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
+        changedMode = False
+        if self.steeringMode != DriveMode.CIRCLESTRAFE and self.joyState['buttonCircleStrafe']:
+            self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
             self.steeringMode = DriveMode.CIRCLESTRAFE
-        else:
+            changedMode = True
+        elif self.steeringMode != DriveMode.FRONT_STEER and self.joyState['buttonFrontSteer']:
+            self.steeringMode = DriveMode.FRONT_STEER
+            changedMode = True
+        elif self.steeringMode != DriveMode.INPLACE and self.joyState['buttonTurnInPlace']:
+            self.steeringMode = DriveMode.INPLACE
+            changedMode = True
+        elif self.steeringMode != DriveMode.STRAFE and self.joyState['buttonStrafe']:
+            self.steeringMode = DriveMode.STRAFE
+            changedMode = True
+        elif self.steeringMode != DriveMode.NORMAL and self.joyState['buttonNormal']:
             self.steeringMode = DriveMode.NORMAL
+            changedMode = True
+        elif self.steeringMode != DriveMode.STOP and self.joyState['buttonStop']:
+            self.steeringMode = DriveMode.STOP
+            changedMode = True
+        elif self.steeringMode != DriveMode.NORMAL:
+            self.steeringMode = DriveMode.NORMAL
+            changedMode = True
         #
-        
-        print("Set driving mode to %s"%self.steeringMode.name)
+        if changedMode:
+            print("Set driving mode to %s"%self.steeringMode.name)
+        #
     #
     
     def updateDriveModeButtonless(self):
@@ -215,7 +238,8 @@ class JoyToCommand:
             self.interpretNormal()
             
         elif self.steeringMode == DriveMode.FRONT_STEER:
-            self.interpretNormal(True)
+            #self.interpretNormal(True)
+            self.interpretTank()
             
         else:
             self.interpretStop()
@@ -374,6 +398,31 @@ class JoyToCommand:
         #
         
         self.updateFullMessage(speed, turnX=self.circleStrafeDistance, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
+        self.publishCommandMessage()
+    #
+    
+    # Drive straight, use tank-tyle steering
+    # This violates so many of the assumptions of this drive code....
+    def interpretTank(self):
+        print('Using interpretTankSteer()')
+        self.strafeAngle = 720.0 # FIXME: Horrible hack to signal "tank mode" to command-to-angles
+        self.turnX = 720.0 # If both turnX and strafeAngle are 720, do tank mode where turnY is steerign speed modifier
+        self.isBraking = False
+        
+        # Set speed
+        self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
+        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], TYCHO_MAX_SPEED, self.speed) )
+        
+        # Set steering values depending on joystick left/right axis
+        self.turnY = self.scaleAndLimitSpeed(self.joyState['joyXAxis'], TANK_STEER_SPEED)
+        self.isStrafing = True
+        
+        # Block backwards driving if reverse mode is off
+        if self.speed < 0 and not self.canReverse:
+            self.isBraking = True # Should this exist?
+            self.speed = 0.0
+        #
+        
         self.publishCommandMessage()
     #
     
