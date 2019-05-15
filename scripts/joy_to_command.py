@@ -314,16 +314,24 @@ class JoyToCommand:
     def interpretStrafe(self):
         print('Using interpretStrafe()')
         
+        # Never allow reversing in strafe mode- it causes messiness
+        # Instead, treat all negative forward-backward joystick values
+        if self.joyState['joyYAxis'] < 0:
+            joyYAxis = self.joyState['joyYAxis']
+        else:
+            joyYAxis = 0
+        #
+        
         # Set speed
-        speed = sqrt(self.joyState['joyXAxis']**2 + self.joyState['joyYAxis']**2)
+        speed = sqrt(self.joyState['joyXAxis']**2 + joyYAxis**2)
         speed = self.scaleAndLimitSpeed(speed, 1.0) # TODO: Change this to limit by maximum possible value in the chosen direction?
         isBraking = False
         print ("Base speed: %.2f"%(speed) )
         
-        if self.joyState['joyYAxis'] != 0:
-            strafeAngle = atan(-self.joyState['joyXAxis'] / self.joyState['joyYAxis'])*180/pi
+        if joyYAxis != 0:
+            strafeAngle = atan(-self.joyState['joyXAxis'] / joyYAxis)*180/pi
         else:
-            strafeAngle = -90.0 * min(max(-self.strafeDeadZone, self.joyState['joyXAxis']), self.strafeDeadZone) / self.strafeDeadZone
+            strafeAngle = 90.0 * min(max(-self.strafeDeadZone, self.joyState['joyXAxis']), self.strafeDeadZone) / self.strafeDeadZone
         print ("Base angle: %.2f"%(strafeAngle) )
         
         # Adjust for deadzone
@@ -340,13 +348,13 @@ class JoyToCommand:
         print ("Adjusted speed: %.2f, Angle: %.2f"%(speed, strafeAngle) )
         
         # TODO If reverse mode active
-        if self.joyState['joyYAxis'] < 0:
-            if self.canReverse:
-                speed = -speed
-            else:
-                speed = 0
-                isBraking = True
-            #
+        #if self.joyState['joyYAxis'] < 0:
+        #    if self.canReverse:
+        #        speed = -speed
+        #    else:
+        #        speed = 0
+        #        isBraking = True
+        #    #
         #
         
         # TODO: What is this fixing?
