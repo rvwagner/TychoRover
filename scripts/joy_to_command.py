@@ -238,8 +238,8 @@ class JoyToCommand:
             self.interpretNormal()
             
         elif self.steeringMode == DriveMode.FRONT_STEER:
-            #self.interpretNormal(True)
-            self.interpretTank()
+            self.interpretNormal(True)
+            #self.interpretTank()
             
         else:
             self.interpretStop()
