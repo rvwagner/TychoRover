@@ -5,7 +5,7 @@
 	<node name="joy_node" pkg="tycho" type="fake_joystick.py" respawn="true" />
 	
 	<!-- Convert joystick to high-level commands -->
-	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" output="screen" >
+	<node name="joy2highlevel" pkg="tycho" type="joy_to_command.py" >
 	    <remap from="tycho/joystick_commands" to="tycho/final_commands" />
 	</node>
 	
@@ -17,6 +17,9 @@
 	<node name="fake_power" pkg="tycho" type="fake_power_monitor.py" respawn="true" />
 	
 	<!-- TODO: Add reader for 9DOF IMU -->
+	
+	<!-- Logger -->
+	<node name="logger" pkg="tycho" type="tycho_logger.py" output="screen" />
 	
 	
 	<!-- Use returned sensor values to establish a dead-reckoning position -->

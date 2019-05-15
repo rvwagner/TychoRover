@@ -38,6 +38,9 @@
 	<!-- Sensors/Logging/Display -->
 	<!-- - - - - - - - - - - - - -->
 	
+	<!-- Logger -->
+	<node name="logger" pkg="tycho" type="tycho_logger.py" />
+	
 	<!-- Use returned sensor values to establish a dead-reckoning position -->
 	<node name="dead_reckoner" pkg="tycho" type="dead_reckoning_position.py" respawn="true" />
 	
@@ -45,5 +48,5 @@
 	<include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch" />
 
 	<!-- Mini-Tycho Arduino -->
-	<node name="serial_bridge_hood_ornament" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" />
+	<!-- <node name="serial_bridge_hood_ornament" pkg="rosserial_python" type="serial_node.py" args="/dev/ttyUSB0" /> -->
 </launch>
