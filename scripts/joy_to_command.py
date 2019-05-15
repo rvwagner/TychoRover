@@ -138,7 +138,7 @@ class JoyToCommand:
         # Ignore stop button release unless joystick is neutral
         if self.joyState['buttonStop'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
             hasChanged = updateValueIfNeeded('buttonStop') or hasChanged
-        if hasChanged:
+        if hasChanged or self.steeringMode == DriveMode.CIRCLESTRAFE:
             self.updateDriveMode()
             self.interpretJoystick()
     #
