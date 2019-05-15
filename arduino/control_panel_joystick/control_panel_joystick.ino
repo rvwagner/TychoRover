@@ -54,6 +54,9 @@ int32_t buttons[]={0,0,0,0,0,0};
 tycho::Mouse mouse_msg;
 ros::Publisher mousePub("tycho/mouse", &mouse_msg);
 
+std_msgs::Int16 log_flag_msg;
+ros::Publisher logFlagPub("tycho/log_flag", &log_flag_msg);
+
 
 const int minSendInterval = 1000 / 50; // second number is min update rate in Hz
 
@@ -121,6 +124,7 @@ void setup() {
   nh.advertise(wheelCal);
   nh.advertise(joyPub);
   nh.advertise(mousePub);
+  nh.advertise(logFlagPub);
 
   driveMode.init(stop_button_index);
   displayPage.init();

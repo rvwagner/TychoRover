@@ -18,14 +18,19 @@ void drive_loop() {
   static long lastSend = 0;
   bool valuesChanged = false;
   
+  // FIXME: QUICK HACK TO REPURPOSE MOUSE BUTTON FOR EVENT FLAGGING
+  if ( mouseButton.checkForButtonChange() ) {
+    logFlagPub.publish( &log_flag_msg );
+  }
   // If the joystick is centered, allow drive mode switching
   if (joy.getX() == 0 && joy.getY() == 0) {
     valuesChanged = driveMode.checkForButtonChange() || valuesChanged;
-    if ( mouseButton.checkForButtonChange() && mouseButton.read()) {
-      driveMode.forceButtonChange(stop_button_index);
-      isMouseMode = true;
-      valuesChanged = true;
-    }
+
+//    if ( mouseButton.checkForButtonChange() && mouseButton.read()) {
+//      driveMode.forceButtonChange(stop_button_index);
+//      isMouseMode = true;
+//      valuesChanged = true;
+//    }
   }
 
   // If it's been a while or the joystick has changed, send a packet
