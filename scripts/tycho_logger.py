@@ -52,7 +52,6 @@ class RoverDriveCommandLogger:
     #
     
     def log(self, msg):
-        print(msg)
         dt = datetime.datetime.fromtimestamp(msg.header.stamp.to_time())
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
         self.file.write("%s  % 6.2f % 6.2f % 6.2f % 6.2f %d %d\n"%(timestamp, msg.speed, msg.turn_center_x, msg.turn_center_y, msg.strafing_angle, msg.is_strafing, msg.is_braking))
@@ -113,6 +112,7 @@ class WheelStatusLogger:
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
         # Drive/steer coord debugging data
         self.nodefilelist[node-1].write("%s  Node %d: Drive: %08X -> % 6.0f = % 6.0f; Steer: t % 6.0f = m % 6.0f ? cmd % 6.0f act % 6.0f\n"%(timestamp, node, int(msg.drive_rpm), msg.drive_amps, msg.drive_spin_count, msg.controller_temp, msg.steering_temp, msg.steering_amps, msg.drive_temp))
+        if node == 1: print("Node %d: Drive: %08X -> % 6.0f = % 6.0f; Steer: t % 6.0f = m % 6.0f ? cmd % 6.0f act % 6.0f\n"%(node, int(msg.drive_rpm), msg.drive_amps, msg.drive_spin_count, msg.controller_temp, msg.steering_temp, msg.steering_amps, msg.drive_temp))
         #print("%s  Node %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(timestamp, node, msg.drive_rpm, msg.drive_amps, msg.drive_spin_count, msg.controller_temp, msg.steering_temp, msg.steering_amps, msg.drive_temp))
     #
 #
@@ -125,6 +125,7 @@ class WheelStatusLogger:
 
 import datetime
 import os
+import errno
 
 t = datetime.datetime.today()
 
@@ -132,6 +133,16 @@ t = datetime.datetime.today()
 # ~/tycho_logs/{date}_{time}
 logdir = t.strftime("/home/pi/tycho_logs/%Y%m%d_%H%M%S")
 os.makedirs(logdir, exist_ok=True)
+try:
+    os.symlink(logdir, "/home/pi/tycho_logs/latest")
+except OSError as e:
+    if e.errno == errno.EEXIST:
+        os.remove("/home/pi/tycho_logs/latest")
+        os.symlink(logdir, "/home/pi/tycho_logs/latest")
+    else:
+        raise e
+#
+print ("Created log directory '%s'"%logdir)
 
 
 # starts the node
