@@ -344,7 +344,7 @@ class JoyToCommand:
         else:
             speed = (speed-self.strafeDeadZone) / (1-self.strafeDeadZone)
         #
-        speed = self.scaleAndLimitSpeed(speed, TYCHO_MAX_STRAFE_SPEED)
+        speed = -self.scaleAndLimitSpeed(speed, TYCHO_MAX_STRAFE_SPEED)
         print ("Adjusted speed: %.2f, Angle: %.2f"%(speed, strafeAngle) )
         
         # TODO If reverse mode active
