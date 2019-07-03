@@ -110,11 +110,13 @@ class JoyToCommand:
                 newdata = (data.buttons[ self.buttonMap[key] ] == 1)
             #
             # Extra deadzone for the steering axis in normal drive mode
-            if self.steeringMode == DriveMode.NORMAL and key == "joyXAxis" and newdata != 0 and abs(newdata - self.joyState[key]) < NORMAL_JOYX_DEADZONE:
-                return False
-            #
-            if self.steeringMode == DriveMode.NORMAL and key == "joyYAxis" and abs(newdata) < 0.1:
-                newdata = 0.0
+            if self.steeringMode == DriveMode.NORMAL or self.steeringMode == DriveMode.FRONT_STEER:
+                if key == "joyXAxis" and newdata != 0 and abs(newdata - self.joyState[key]) < NORMAL_JOYX_DEADZONE:
+                    return False
+                #
+                if key == "joyYAxis" and abs(newdata) < 0.1:
+                    newdata = 0.0
+                #
             #
             if self.joyState[key] != newdata:
                 self.joyState[key] = newdata
@@ -136,7 +138,7 @@ class JoyToCommand:
         hasChanged = updateValueIfNeeded('buttonFrontSteer') or hasChanged
         
         # Ignore stop button release unless joystick is neutral
-        if self.joyState['buttonStop'] == 0 or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
+        if not self.joyState['buttonStop'] or (self.joyState['joyXAxis'] == 0 and self.joyState['joyYAxis'] == 0):
             hasChanged = updateValueIfNeeded('buttonStop') or hasChanged
         if hasChanged:
             self.updateDriveMode()
@@ -163,28 +165,28 @@ class JoyToCommand:
         If no buttons are pressed, defaults to DriveMode.NORMAL
         """
         changedMode = False
-        if self.steeringMode != DriveMode.CIRCLESTRAFE and self.joyState['buttonCircleStrafe']:
-            self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
-            self.steeringMode = DriveMode.CIRCLESTRAFE
-            changedMode = True
-        elif self.steeringMode != DriveMode.FRONT_STEER and self.joyState['buttonFrontSteer']:
-            self.steeringMode = DriveMode.FRONT_STEER
-            changedMode = True
-        elif self.steeringMode != DriveMode.INPLACE and self.joyState['buttonTurnInPlace']:
-            self.steeringMode = DriveMode.INPLACE
-            changedMode = True
-        elif self.steeringMode != DriveMode.STRAFE and self.joyState['buttonStrafe']:
-            self.steeringMode = DriveMode.STRAFE
-            changedMode = True
-        elif self.steeringMode != DriveMode.NORMAL and self.joyState['buttonNormal']:
-            self.steeringMode = DriveMode.NORMAL
-            changedMode = True
-        elif self.steeringMode != DriveMode.STOP and self.joyState['buttonStop']:
-            self.steeringMode = DriveMode.STOP
-            changedMode = True
-        elif self.steeringMode != DriveMode.NORMAL and not self.joyState['buttonStop'] and not self.joyState['buttonNormal'] and not self.joyState['buttonStrafe'] and not self.joyState['buttonTurnInPlace'] and not self.joyState['buttonFrontSteer'] and not self.joyState['buttonCircleStrafe']:
-            self.steeringMode = DriveMode.NORMAL
-            changedMode = True
+        def changeModeIfNeeded(mode):
+            if self.steeringMode != mode:
+                self.steeringMode = mode
+                return True
+            return False
+        #
+        if self.joyState['buttonCircleStrafe']:
+            changedMode = changeModeIfNeeded(DriveMode.CIRCLESTRAFE)
+            if changedMode:
+                self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
+        elif self.joyState['buttonFrontSteer']:
+            changedMode = changeModeIfNeeded(DriveMode.FRONT_STEER)
+        elif self.joyState['buttonTurnInPlace']:
+            changedMode = changeModeIfNeeded(DriveMode.INPLACE)
+        elif self.joyState['buttonStrafe']:
+            changedMode = changeModeIfNeeded(DriveMode.STRAFE)
+        elif self.joyState['buttonNormal']:
+            changedMode = changeModeIfNeeded(DriveMode.NORMAL)
+        elif self.joyState['buttonStop']:
+            changedMode = changeModeIfNeeded(DriveMode.STOP)
+        else:
+            changedMode = changeModeIfNeeded(DriveMode.NORMAL)
         #
         if changedMode:
             print("Set driving mode to %s"%self.steeringMode.name)
