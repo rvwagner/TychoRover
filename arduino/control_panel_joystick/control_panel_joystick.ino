@@ -55,7 +55,7 @@ tycho::Mouse mouse_msg;
 ros::Publisher mousePub("tycho/mouse", &mouse_msg);
 
 
-const int minSendInterval = 1000 / 50; // second number is min update rate in Hz
+const unsigned long minSendInterval = 1000 / 50; // second number is min update rate in Hz
 
 
 
