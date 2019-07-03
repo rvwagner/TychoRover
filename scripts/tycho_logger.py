@@ -6,6 +6,7 @@ from tycho.msg import WheelStatus
 from tycho.msg import RoverDriveCommand
 from std_msgs.msg import Float32MultiArray
 from std_msgs.msg import Int16
+from sensor_msgs.msg import Joy
 
 
 #########
@@ -13,10 +14,11 @@ from std_msgs.msg import Int16
 #########
 
 
-class RoverDriveCommandLogger:
+class JoyLogger:
     def __init__(self, directory):
-        rospy.Subscriber("tycho/high_level_motor_values", RoverDriveCommand, self.log, queue_size=100)
-        self.file = open("%s/high_level_command_log.txt"%directory, 'w')
+        rospy.Subscriber("tycho/joy", Joy, self.log, queue_size=100)
+        self.file = open("%s/joy_log.txt"%directory, 'w')
+        self.file.write("date, x_axis, y_axis, buttons 1, 2, 3, 4, 5, 6")
     #
     
     def closeout(self):
@@ -29,7 +31,29 @@ class RoverDriveCommandLogger:
     #
     
     def log(self, msg):
-        node=msg.wheel_id
+        dt = datetime.datetime.fromtimestamp(msg.header.stamp.to_time())
+        timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+        self.file.write("%s  % 6.4f % 6.4f %d %d %d %d %d %d\n"%(timestamp, msg.axes[0], msg.axes[1], msg.buttons[0], msg.buttons[1], msg.buttons[2], msg.buttons[3], msg.buttons[4], msg.buttons[5]))
+    #
+#
+
+class RoverDriveCommandLogger:
+    def __init__(self, directory):
+        rospy.Subscriber("tycho/high_level_motor_values", RoverDriveCommand, self.log, queue_size=100)
+        self.file = open("%s/high_level_command_log.txt"%directory, 'w')
+        self.file.write("date, speed, turn_center_x, turn_center_y, strafing_angle, is_strafing, is_braking")
+    #
+    
+    def closeout(self):
+        self.file.close()
+    #
+    
+    def add_flag(self):
+        t = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S.%f")
+        self.file.write("%s  FLAGGED EVENT "%t)
+    #
+    
+    def log(self, msg):
         dt = datetime.datetime.fromtimestamp(msg.header.stamp.to_time())
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
         self.file.write("%s  % 6.2f % 6.2f % 6.2f % 6.2f %d %d\n"%(timestamp, msg.speed, msg.turn_center_x, msg.turn_center_y, msg.strafing_angle, msg.is_strafing, msg.is_braking))
@@ -40,6 +64,7 @@ class WheelAnglesSpeedsLogger:
     def __init__(self, directory):
         rospy.Subscriber("tycho/low_level_motor_values", WheelAnglesSpeeds, self.log, queue_size=100)
         self.file = open("%s/low_level_command_log.txt"%directory, 'w')
+        self.file.write("date, front_left_angle, front_left_speed, front_right_angle, front_right_speed, back_left_angle, back_left_speed, back_right_angle, back_right_speed")
     #
     
     def closeout(self):
@@ -52,7 +77,6 @@ class WheelAnglesSpeedsLogger:
     #
     
     def log(self, msg):
-        node=msg.wheel_id
         dt = datetime.datetime.fromtimestamp(msg.header.stamp.to_time())
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
         self.file.write("%s  % 6.2f % 6.2f % 6.2f % 6.2f % 6.2f % 6.2f % 6.2f % 6.2f\n"%(timestamp, msg.front_left_angle, msg.front_left_speed, msg.front_right_angle, msg.front_right_speed, msg.back_left_angle, msg.back_left_speed, msg.back_right_angle, msg.back_right_speed))
@@ -69,6 +93,10 @@ class WheelStatusLogger:
         self.nodefilelist.append(open("%s/node_2_responses_log.txt"%directory, 'w'))
         self.nodefilelist.append(open("%s/node_3_responses_log.txt"%directory, 'w'))
         self.nodefilelist.append(open("%s/node_4_responses_log.txt"%directory, 'w'))
+        
+        for node in [0, 1, 2, 3]:
+            self.nodefilelist[node].write("Date   DRIVE: FF & FS & MOTCMD_2 -> Final_Drive_Speed = MOTPWR_Drive     ; Steer: t Target_Steering_Angle = m Target_Steering_Power ? cmd MOTPWR_Steer act Current_Steering_Angle)
+            self.nodefilelist[node].write("FF: Page 245    FS: page 247")
     #
     
     def closeout(self):
@@ -95,8 +123,6 @@ class WheelStatusLogger:
     #
 #
 
-
-
 #############
 # Main Loop #
 #############
@@ -120,6 +146,7 @@ print("Subscribing to topics")
 wsl = WheelStatusLogger(logdir)
 rdcl = RoverDriveCommandLogger
 wasl = WheelAnglesSpeedsLogger
+jl = JoyLogger
 
 
 print ("Starting main loop")
@@ -131,4 +158,4 @@ while not rospy.is_shutdown():
 wsl.closeout()
 rdcl.closeout()
 wasl.closeout()
-
+jl.closeout()
