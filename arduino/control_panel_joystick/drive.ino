@@ -15,7 +15,7 @@ void sendJoyMessage(){
 
   
 void drive_loop() {
-  static long lastSend = 0;
+  static unsigned long lastSend = 0;
   bool valuesChanged = false;
   
   // FIXME: QUICK HACK TO REPURPOSE MOUSE BUTTON FOR EVENT FLAGGING
@@ -34,7 +34,7 @@ void drive_loop() {
   }
 
   // If it's been a while or the joystick has changed, send a packet
-  if (valuesChanged || (lastSend - millis()) > minSendInterval){
+  if (valuesChanged || (millis() - lastSend) > minSendInterval){
     sendJoyMessage();
     lastSend = millis();
   }

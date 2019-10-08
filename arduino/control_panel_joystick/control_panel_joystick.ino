@@ -58,7 +58,7 @@ std_msgs::Int16 log_flag_msg;
 ros::Publisher logFlagPub("tycho/log_flag", &log_flag_msg);
 
 
-const int minSendInterval = 1000 / 50; // second number is min update rate in Hz
+const unsigned long minSendInterval = 1000 / 50; // second number is min update rate in Hz
 
 
 

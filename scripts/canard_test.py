@@ -275,34 +275,35 @@ def new_command_callback(data):
 
 # TODO: Verify value scaling
 def handleTPDO(index, node, data1, data2):
-	if index == 1: # TPDO1: RMP 1, Amps 1
-		wheel_statuses[node].drive_rpm = data1 # TODO: convert to rpm or to m/s
-		wheel_statuses[node].drive_amps = data2 #abs(data2) / 10.0
-		ready_to_send[node] |= 0x1
-	elif index == 2: # TPDO2: Count 1, MCU Temp
-		wheel_statuses[node].drive_spin_count = data1
-		wheel_statuses[node].controller_temp = data2 #/ 10.0
-		ready_to_send[node] |= 0x2
-	elif index == 3: # TPDO3: Angle 2, Amps 2
-		wheel_statuses[node].steering_angle = data1 / 10.0
-		wheel_statuses[node].steering_amps = data2 #abs(data2) / 10.0
-		ready_to_send[node] |= 0x4
-	elif index == 4: # TPDO4: Temp 1, Temp 2
-		wheel_statuses[node].drive_temp = data1 #/ 10.0
-		wheel_statuses[node].steering_temp = data2 #/ 10.0
-		ready_to_send[node] |= 0x8
-	else:
-		return # TODO: Throw an error
-	#
-	
-	if ready_to_send[node] == 0xF:
-		if node == 2:
-			# Drive/steer coord debugging data
-			print("Node %d: Drive: % 6.0f -> % 6.0f = % 6.0f; Steer: t % 6.0f = m % 6.0f ? cmd % 6.0f act % 6.0f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_temp, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp))
-			#print("Publishing %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
-		statuspub.publish(wheel_statuses[node])
-		ready_to_send[node] = 0x0
-	#
+    if index == 1: # TPDO1: RMP 1, Amps 1
+        wheel_statuses[node].drive_rpm = data1 # TODO: convert to rpm or to m/s
+        wheel_statuses[node].drive_amps = data2 #abs(data2) / 10.0
+        ready_to_send[node] |= 0x1
+    elif index == 2: # TPDO2: Count 1, MCU Temp
+        wheel_statuses[node].drive_spin_count = data1
+        wheel_statuses[node].controller_temp = data2 #/ 10.0
+        ready_to_send[node] |= 0x2
+    elif index == 3: # TPDO3: Angle 2, Amps 2
+        wheel_statuses[node].steering_angle = data1 / 10.0
+        wheel_statuses[node].steering_amps = data2 #abs(data2) / 10.0
+        ready_to_send[node] |= 0x4
+    elif index == 4: # TPDO4: Temp 1, Temp 2
+        wheel_statuses[node].drive_temp = data1 #/ 10.0
+        wheel_statuses[node].steering_temp = data2 #/ 10.0
+        ready_to_send[node] |= 0x8
+    else:
+        return # TODO: Throw an error
+    #
+    
+    if ready_to_send[node] == 0xF:
+        wheel_statuses[node].header.stamp = rospy.Time.now()
+        if node == 2:
+            # Drive/steer coord debugging data
+            print("Node %d: Drive: % 6.0f -> % 6.0f = % 6.0f; Steer: t % 6.0f = m % 6.0f ? cmd % 6.0f act % 6.0f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_temp, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp))
+            #print("Publishing %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
+        statuspub.publish(wheel_statuses[node])
+        ready_to_send[node] = 0x0
+    #
 #
 
 
