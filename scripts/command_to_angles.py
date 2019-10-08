@@ -4,7 +4,7 @@ from tycho.msg import RoverDriveCommand, WheelAnglesSpeeds
 from math import atan, atan2, sqrt, pi
 
 # Author: Robert Wagner
-
+TYCHO_MAX_WHEEL_SPEED = 4200; # mm/s # FIXME: This should be pulled from a config file
 
 class CommandToAngles:
     def __init__(self):
@@ -38,14 +38,18 @@ class CommandToAngles:
         # Dimensional Model #
         #####################
         
-        self.maxWheelSpeed = 4200; # mm/s # FIXME: This should be pulled from a config file
-        self.steerRate = 500.0; # Servo nominally rotates at 500deg/sec
+        self.maxWheelSpeed = TYCHO_MAX_WHEEL_SPEED
+        self.steerRate = 500.0 # Servo nominally rotates at 500deg/sec
         # +X is forward, +Y is left, numbers in scale meters
         self.jointX = {'FrontLeft': 1.17, 'FrontRight': 1.17,
-                       'BackLeft': -1.17, 'BackRight': -1.17};
+                       'BackLeft': -1.17, 'BackRight': -1.17}
         self.jointY = {'FrontLeft': 0.635, 'FrontRight': -0.635,
-                       'BackLeft':  0.635, 'BackRight':  -0.635};
-        self.steeringArmLength = 0.365; # Pivot to center of tire
+                       'BackLeft':  0.635, 'BackRight':  -0.635}
+        self.steeringArmLength = { # Pivot to center of tire
+                                    'FrontLeft':  0.31115,
+                                    'FrontRight': 0.31115,
+                                    'BackLeft':   0.273,
+                                    'BackRight':  0.273}
         
         # System to rate-limit messages
         self.hasNewMessage = False
@@ -197,9 +201,9 @@ class CommandToAngles:
             if turnCenterY/self.jointY[i] > 1:
                 # Same sign and abs(turnCenterY) > abs(self.jointY)
                 # -> Arm points towards point
-                distTotal -= self.steeringArmLength;
+                distTotal -= self.steeringArmLength[i]
             else: # Arm points away from point
-                distTotal += self.steeringArmLength;
+                distTotal += self.steeringArmLength[i]
             #
 
             # For very small offsets from turn-in-place, make all wheel speeds match here to avoid rounding issues
