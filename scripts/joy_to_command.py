@@ -19,6 +19,8 @@ TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 1
 TYCHO_MAX_SPIN_SPEED = 1000.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
+TYCHO_MAX_ACCEL = 2000.0 # in mm/s^2, primarily used for gentle braking
+
 TANK_STEER_SPEED = 500.0 # Maximum speed adjustment for tank steering
 
 TYCHO_MINIMUM_TURN_RADIUS = 1
@@ -60,13 +62,14 @@ class JoyToCommand:
         # Internal state of the high-level command to send
         # Used to allow stop button to maintain state on steering with minimal
         # interaction with other drive modes
-        self.speed = 0
+        self.target_speed = 0
+        self.actual_speed = 0
         self.turnX = 0
         self.turnY = 0
         self.strafeAngle = 0
         self.isStrafing  = True
         self.isBraking   = True
-        
+        self.lastSpeedUpdateTime = 0
         
         self.buttonMap = {}
         self.buttonMap['joyXAxis'] = 0
@@ -92,6 +95,30 @@ class JoyToCommand:
         self.pub = rospy.Publisher('tycho/joystick_commands', RoverDriveCommand, queue_size=1)
     #
     
+    # Use the time since the last update to accelerate towards the target speed
+    def update_speed(self):
+        # Always update the timestamp
+        new_time = rospy.Time.now()
+        delta_time = new_time - self.lastSpeedUpdateTime # TODO: CONVERT DELTA_TIME TO SECONDS
+        delta_time = 0.01
+        self.lastSpeedUpdateTime = new_time
+        
+        # Get amount left to accelerate
+        delta_speed = self.target_speed - self.speed
+        if delta_speed = 0.0: return
+        
+        # If a change is needed, apply it
+        max_delta = TYCHO_MAX_ACCEL * delta_time
+        if abs(delta_speed) < max_delta: # Don't need the max accel to reach target
+            self.speed = self.target_speed
+        else:
+            if delta_speed < 0:
+                self.speed -= max_delta
+            else:
+                self.speed += max_delta
+        #
+        return
+    #
     
     def callback(self, data):
         """
@@ -106,6 +133,7 @@ class JoyToCommand:
         def updateValueIfNeeded(key, isAxis=False):
             if isAxis:
                 newdata = data.axes[ self.buttonMap[key] ]
+                #TODO: Apply an exponential remapping here?
             else:
                 newdata = (data.buttons[ self.buttonMap[key] ] == 1)
             #
@@ -255,7 +283,8 @@ class JoyToCommand:
     # Stop movement, but don't touch the wheel angles
     def interpretStop(self):
         self.isBraking   = True
-        self.speed = 0
+        self.speed = 0 # The "stop" mode should allow slamming on the brakes
+        self.target_speed = 0
         self.publishCommandMessage()
     #
     
@@ -274,8 +303,8 @@ class JoyToCommand:
         self.isBraking = False
         
         # Set speed
-        self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], speedLimit)
-        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], speedLimit, self.speed) )
+        self.target_speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], speedLimit)
+        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], speedLimit, self.target_speed) )
         
         # Set steering values depending on joystick left/right axis
         if (self.joyState['joyXAxis'] != 0.0):
@@ -290,14 +319,14 @@ class JoyToCommand:
          
         # Request brake engagement if needed
         # This isn't actually good, as it will prevent steering while stopped...
-        #if self.speed == 0.0 or self.joyState['buttonStop']:
+        #if self.target_speed == 0.0 or self.joyState['buttonStop']:
         #    self.isBraking = True
         #
         
         # Block backwards driving if reverse mode is off
-        if self.speed < 0 and not self.canReverse:
+        if self.target_speed < 0 and not self.canReverse:
             self.isBraking = True # Should this exist?
-            self.speed = 0.0
+            self.target_speed = 0.0
         #
         
         # Rotate the steering axis so that strafeAngle is forward
@@ -418,17 +447,17 @@ class JoyToCommand:
         self.isBraking = False
         
         # Set speed
-        self.speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
-        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], TYCHO_MAX_SPEED, self.speed) )
+        self.target_speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
+        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], TYCHO_MAX_SPEED, self.target_speed) )
         
         # Set steering values depending on joystick left/right axis
         self.turnY = self.scaleAndLimitSpeed(self.joyState['joyXAxis'], TANK_STEER_SPEED)
         self.isStrafing = True
         
         # Block backwards driving if reverse mode is off
-        if self.speed < 0 and not self.canReverse:
+        if self.target_speed < 0 and not self.canReverse:
             self.isBraking = True # Should this exist?
-            self.speed = 0.0
+            self.target_speed = 0.0
         #
         
         self.publishCommandMessage()
@@ -436,7 +465,7 @@ class JoyToCommand:
     
     # Update all values of saved command state at once
     def updateFullMessage(self, speed, turnX, turnY, strafeAngle, isStrafing, isBraking):
-        self.speed = speed
+        self.target_speed = speed
         self.turnX = turnX
         self.turnY = turnY
         self.strafeAngle = strafeAngle
@@ -452,6 +481,7 @@ class JoyToCommand:
             speed=0
             isBraking=True
         #
+        self.update_speed()
         m = RoverDriveCommand()
         m.header.stamp = rospy.Time.now()
         m.speed          = self.speed
@@ -475,13 +505,19 @@ class JoyToCommand:
     # bool    is_braking
 
 
-# Intializes everything
+# Intialize everything
 def start():
     rospy.init_node('Joy2Tycho')
     interpreter = JoyToCommand() # subscribes to joystick inputs on topic "joy"
     
     # starts the node
-    rospy.spin()
+    #rospy.spin()
+    # Send a new command every 10ms, to allow smooth acceleration
+    rate = rospy.Rate(100) # Hz
+    while not rospy.is_shutdown():
+        rate.sleep()
+        interpreter.publishMessage()
+    #
 #
 
 if __name__ == '__main__':
