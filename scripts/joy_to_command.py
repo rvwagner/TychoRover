@@ -69,7 +69,7 @@ class JoyToCommand:
         self.strafeAngle = 0
         self.isStrafing  = True
         self.isBraking   = True
-        self.lastSpeedUpdateTime = 0
+        self.lastSpeedUpdateTime = rospy.Time.now()
         
         self.buttonMap = {}
         self.buttonMap['joyXAxis'] = 0
@@ -99,23 +99,22 @@ class JoyToCommand:
     def update_speed(self):
         # Always update the timestamp
         new_time = rospy.Time.now()
-        delta_time = new_time - self.lastSpeedUpdateTime # TODO: CONVERT DELTA_TIME TO SECONDS
-        delta_time = 0.01
+        delta_time = (new_time - self.lastSpeedUpdateTime).to_sec()
         self.lastSpeedUpdateTime = new_time
         
         # Get amount left to accelerate
-        delta_speed = self.target_speed - self.speed
-        if delta_speed = 0.0: return
+        delta_speed = self.target_speed - self.actual_speed
+        if delta_speed == 0.0: return
         
         # If a change is needed, apply it
         max_delta = TYCHO_MAX_ACCEL * delta_time
         if abs(delta_speed) < max_delta: # Don't need the max accel to reach target
-            self.speed = self.target_speed
+            self.actual_speed = self.target_speed
         else:
             if delta_speed < 0:
-                self.speed -= max_delta
+                self.actual_speed -= max_delta
             else:
-                self.speed += max_delta
+                self.actual_speed += max_delta
         #
         return
     #
@@ -285,7 +284,7 @@ class JoyToCommand:
     # Stop movement, but don't touch the wheel angles
     def interpretStop(self):
         self.isBraking   = True
-        self.speed = 0 # The "stop" mode should allow slamming on the brakes
+        self.actual_speed = 0 # The "stop" mode should allow slamming on the brakes
         self.target_speed = 0
         self.publishCommandMessage()
     #
@@ -486,13 +485,13 @@ class JoyToCommand:
         self.update_speed()
         m = RoverDriveCommand()
         m.header.stamp = rospy.Time.now()
-        m.speed          = self.speed
+        m.speed          = self.actual_speed
         m.turn_center_x  = self.turnX
         m.turn_center_y  = self.turnY
         m.strafing_angle = self.strafeAngle
         m.is_strafing    = self.isStrafing
         m.is_braking     = self.isBraking
-        print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
+        print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.actual_speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
         
         self.pub.publish(m)
     #
@@ -518,7 +517,7 @@ def start():
     rate = rospy.Rate(100) # Hz
     while not rospy.is_shutdown():
         rate.sleep()
-        interpreter.publishMessage()
+        interpreter.publishCommandMessage()
     #
 #
 
