@@ -96,7 +96,7 @@ class WheelStatusLogger:
         self.nodefilelist.append(open("%s/node_4_responses_log.txt"%directory, 'w', buffering=1))
         
         for node in [0, 1, 2, 3]:
-            self.nodefilelist[node].write("Date   DRIVE: FF & FS & MOTCMD_2 -> Final_Drive_Speed = MOTPWR_Drive     ; Steer: t Target_Steering_Angle = m Target_Steering_Power ? cmd MOTPWR_Steer act Current_Steering_Angle)
+            self.nodefilelist[node].write("Date   DRIVE: FF & FS & MOTCMD_2 -> Final_Drive_Speed = MOTPWR_Drive     ; Steer: t Target_Steering_Angle = m Target_Steering_Power ? cmd MOTPWR_Steer act Current_Steering_Angle")
             self.nodefilelist[node].write("FF: Page 245    FS: page 247")
     #
     
