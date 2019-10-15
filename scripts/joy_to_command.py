@@ -108,6 +108,12 @@ class JoyToCommand:
         
         # If a change is needed, apply it
         max_delta = TYCHO_MAX_ACCEL * delta_time
+        if self.target_speed == 0:
+            if abs(self.actual_speed) < 400: # Remember: speeds are in mm/s, not m/s!
+                max_delta /=3
+            elif abs(self.actual_speed) < 100:
+                max_delta /=6
+        #
         if abs(delta_speed) < max_delta: # Don't need the max accel to reach target
             self.actual_speed = self.target_speed
         else:
@@ -116,6 +122,7 @@ class JoyToCommand:
             else:
                 self.actual_speed += max_delta
         #
+        print(self.actual_speed, self.target_speed)
         return
     #
     
@@ -409,7 +416,7 @@ class JoyToCommand:
         #    isBraking = False
         #
         
-        self.updateFullMessage(speed, turnX=0, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
+        self.updateFullMessage(speed, turnX=-1.17, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
         self.publishCommandMessage()
     #
     
@@ -491,7 +498,7 @@ class JoyToCommand:
         m.strafing_angle = self.strafeAngle
         m.is_strafing    = self.isStrafing
         m.is_braking     = self.isBraking
-        print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.actual_speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
+        # print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.actual_speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
         
         self.pub.publish(m)
     #
