@@ -29,7 +29,15 @@ TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
 TYCHO_MINIMUM_CIRCLE_STRAFE_DISTANCE = 1.5
 TYCHO_CSTRAFE_ADJUST_RATE = 0.75
 
-TYCHO_DRIVE_MODE_ACKERMANN = True
+TYCHO_WHEEL_X_DISTANCE = 1.17
+class EndStatus(Enum):
+    BOTH = 1
+    FRONT_ONLY = 2
+    BACK_ONLY = 3
+#
+TYCHO_DRIVE_END_STATUS = EndStatus.FRONT_ONLY
+
+
 
 NORMAL_JOYX_DEADZONE = 0.20 # In normal mode, joystick must move this much from [current position] to register as a change
 
@@ -54,7 +62,6 @@ class JoyToCommand:
         
         self.steeringMode = DriveMode.STOP
         self.canReverse = True;
-        self.isAckermann = TYCHO_DRIVE_MODE_ACKERMANN
         self.lastNonZeroTime = rospy.Time.now() # Used for buttonless mode updater
         self.lastCStrafeUpdateTime = rospy.Time.now() # Used for getting the right change rate on circle-strafe mode
         self.circleStrafeDistance = TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE
@@ -108,7 +115,7 @@ class JoyToCommand:
         
         # If a change is needed, apply it
         max_delta = TYCHO_MAX_ACCEL * delta_time
-        if self.target_speed == 0:
+        if self.target_speed == 0: # Reduce accel limit when approaching 0
             if abs(self.actual_speed) < 400: # Remember: speeds are in mm/s, not m/s!
                 max_delta /=3
             elif abs(self.actual_speed) < 100:
@@ -301,11 +308,18 @@ class JoyToCommand:
     def interpretNormal(self, isAckermann=False):
         print('Using interpretNormal()')
         self.strafeAngle = 0
-        if isAckermann:
-            self.turnX = -1.17 # Correct value for Ackermann steering - in line with rear axle
+        if isAckermann and TYCHO_DRIVE_END_STATUS is not EndStatus.BACK_ONLY:
+            # Force front-only steering if commanded and possibly, otherwise fall back on defaults
+            self.turnX = -TYCHO_WHEEL_X_DISTANCE # Rear axle
             speedLimit = TYCHO_MAX_FWD_SPEED
         else:
-            self.turnX = 0
+            if TYCHO_DRIVE_END_STATUS is EndStatus.FRONT_ONLY:
+                self.turnX = -TYCHO_WHEEL_X_DISTANCE # Rear axle
+            elif TYCHO_DRIVE_END_STATUS is EndStatus.BACK_ONLY:
+                self.turnX = TYCHO_WHEEL_X_DISTANCE # Front axle
+            else: # TYCHO_DRIVE_END_STATUS is EndStatus.BOTH:
+                self.turnX = 0 # Center of rover
+            #
             speedLimit = TYCHO_MAX_SPEED
         #
         self.isBraking = False
@@ -350,6 +364,12 @@ class JoyToCommand:
     # Drive straight in any direction
     def interpretStrafe(self):
         print('Using interpretStrafe()')
+        
+        if TYCHO_DRIVE_END_STATUS is not EndStatus.BOTH:
+            print ("ERROR: Cannot strafe without all wheels")
+            # TODO: Fall back on something else, or just stop?
+            return
+        #
         
         # Never allow reversing in strafe mode- it causes messiness
         # Instead, treat all negative forward-backward joystick values
@@ -410,19 +430,28 @@ class JoyToCommand:
         speed = self.joyState['joyXAxis']
         speed = self.scaleAndLimitSpeed(self.joyState['joyXAxis'], TYCHO_MAX_SPIN_SPEED)
         
-        #if speed == 0.0 or self.joyState['buttonStop']:
-        #    isBraking = True
-        #else:
-        #    isBraking = False
+        if TYCHO_DRIVE_END_STATUS is EndStatus.FRONT_ONLY:
+            self.turnX = -TYCHO_WHEEL_X_DISTANCE # Rear axle
+        elif TYCHO_DRIVE_END_STATUS is EndStatus.BACK_ONLY:
+            self.turnX = TYCHO_WHEEL_X_DISTANCE # Front axle
+        else:
+            self.turnX = 0 # Center of rover
         #
         
-        self.updateFullMessage(speed, turnX=-1.17, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
+        self.updateFullMessage(speed, turnX=self.turnX, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
         self.publishCommandMessage()
     #
     
     # Spin about a point in front of the rover
     def interpretCircleStrafe(self):
         print ('Using interpretCircleStrafe()')
+        
+        if TYCHO_DRIVE_END_STATUS is not EndStatus.BOTH:
+            print ("ERROR: Cannot strafe without all wheels")
+            # TODO: Fall back on something else, or just stop?
+            return
+        #
+        
         speed = -self.joyState['joyXAxis']
         speed = self.scaleAndLimitSpeed(-self.joyState['joyXAxis'], TYCHO_MAX_CIRCLE_STRAFE_SPEED)
         
