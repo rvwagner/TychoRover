@@ -1,0 +1,28 @@
+
+/tycho/speeds/
+max_wheel: # Maximum speed of a single wheel
+
+# FIXME: Should load this from a parameter file
+# Max speeds in mm/s; accelerations are in mm/s^2
+max_normal:   1000.0 # Max speed for normal driving mode # TYCHO_MAX_SPEED
+max_fwd:      2000.0 # Front-wheel-drive mode speed limit
+max_strafe:   1000.0 # Max speed in normal strafing mode
+max_spin:     1000.0 # Max speed in spin-in-place mode
+max_c_strafe: 1000.0 # Max speed for circle-strafing
+max_accel:    2000.0 # Max acceleration in all modes, primarily used for gentle braking
+c_strafe_adjust_rate: 0.75 # m/s
+
+/tycho/dimensions/
+# All distances in meters
+wheel_x_distance = 1.17
+wheel_y_distance = ???
+# self.jointX = rospy.get_param("/tycho/joint_x_positions")
+# self.jointX = rospy.get_param("/tycho/joint_y_positions")
+# self.jointX = rospy.get_param("/tycho/steering_arm_lengths")
+minimum_side_radius: 1.0 
+minimum_front_radius: 1.5
+default_front_radius: 2.5
+
+/tycho/status/
+active_ends: FRONT_ONLY # String, "BOTH", "FRONT_ONLY", or "BACK_ONLY"
+

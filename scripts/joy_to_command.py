@@ -31,9 +31,9 @@ TYCHO_CSTRAFE_ADJUST_RATE = 0.75
 
 TYCHO_WHEEL_X_DISTANCE = 1.17
 class EndStatus(Enum):
-    BOTH = 1
-    FRONT_ONLY = 2
-    BACK_ONLY = 3
+    BOTH = "BOTH"
+    FRONT_ONLY = "FRONT_ONLY"
+    BACK_ONLY = "BACK_ONLY"
 #
 TYCHO_DRIVE_END_STATUS = EndStatus.FRONT_ONLY
 
@@ -147,6 +147,12 @@ class JoyToCommand:
             if isAxis:
                 newdata = data.axes[ self.buttonMap[key] ]
                 #TODO: Apply an exponential remapping here?
+                # Nah, probably better to do so in the various Interpret functions
+                # https://www.chiefdelphi.com/t/paper-joystick-sensitivity-gain-adjustment/107280/3
+                # joystick_exp_gain = 0.6   # Range [0-1]
+                # x = joystick_exp_gain*(x**3) + (1-joystick_exp_gain)*x
+                # See also https://www.chiefdelphi.com/t/paper-joystick-sensitivity-gain-adjustment/107280/12
+                # for possible use in the normal steering mode to tweak minimum turning arc
             else:
                 newdata = (data.buttons[ self.buttonMap[key] ] == 1)
             #

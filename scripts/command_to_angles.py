@@ -5,6 +5,7 @@ from math import atan, atan2, sqrt, pi
 
 # Author: Robert Wagner
 TYCHO_MAX_WHEEL_SPEED = 4200; # mm/s # FIXME: This should be pulled from a config file
+# TYCHO_MAX_WHEEL_SPEED = rospy.get_param("/tycho/speeds/max_wheel")
 
 class CommandToAngles:
     def __init__(self):
@@ -41,6 +42,10 @@ class CommandToAngles:
         self.maxWheelSpeed = TYCHO_MAX_WHEEL_SPEED
         self.steerRate = 500.0 # Servo nominally rotates at 500deg/sec
         # +X is forward, +Y is left, numbers in scale meters
+        # TODO: Load these from ROS parameter server
+        # self.jointX = rospy.get_param("/tycho/joint_x_positions")
+        # self.jointX = rospy.get_param("/tycho/joint_y_positions")
+        # self.jointX = rospy.get_param("/tycho/steering_arm_lengths")
         self.jointX = {'FrontLeft': 1.17, 'FrontRight': 1.17,
                        'BackLeft': -1.17, 'BackRight': -1.17}
         self.jointY = {'FrontLeft': 0.635, 'FrontRight': -0.635,
