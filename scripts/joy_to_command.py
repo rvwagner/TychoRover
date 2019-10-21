@@ -114,13 +114,20 @@ class JoyToCommand:
         if delta_speed == 0.0: return
         
         # If a change is needed, apply it
-        max_delta = TYCHO_MAX_ACCEL * delta_time
+        # TODO: Move these to a parameter file
+        max_accel = 4000.0
         if self.target_speed == 0: # Reduce accel limit when approaching 0
-            if abs(self.actual_speed) < 400: # Remember: speeds are in mm/s, not m/s!
-                max_delta /=3
+            if abs(self.actual_speed) < 30: # Remember: speeds are in mm/s, not m/s!
+                max_accel = 30.0
             elif abs(self.actual_speed) < 100:
-                max_delta /=6
+                max_accel = 100.0
+            elif abs(self.actual_speed) < 1000:
+                max_accel = 2000.0
         #
+        max_delta = max_accel * delta_time
+        
+        print(self.actual_speed, self.target_speed, delta_time, max_delta, delta_speed)
+        
         if abs(delta_speed) < max_delta: # Don't need the max accel to reach target
             self.actual_speed = self.target_speed
         else:
@@ -129,7 +136,6 @@ class JoyToCommand:
             else:
                 self.actual_speed += max_delta
         #
-        print(self.actual_speed, self.target_speed)
         return
     #
     
