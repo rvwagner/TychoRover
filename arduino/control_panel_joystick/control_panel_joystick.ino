@@ -164,10 +164,7 @@ void loop(){
   
   if(!nh.connected()) waitForMaster();
   
-  
-  
   joy.update();
-  
   
   if (displayPage.checkForButtonChange()) changeMessageDisplayPage();
   

@@ -171,8 +171,6 @@ private:
 // Class that implements a state machine to debounce a virtual latching button
 
 const int joy_avg_length = 6;
-const double joyXDeadLimit = 24/512.0; // Post-mapping
-const double joyYDeadLimit = 24/512.0; // Post-mapping
 
 class Joystick{
 public:
@@ -180,16 +178,18 @@ public:
     x_pin = xpin;
     y_pin = ypin;
     isCalibrating = false;
-    setCalibration(0, 512, 1023, 0, 512, 1023);
+    setCalibration(0, 500, 540, 1023, 0, 470, 520, 1023);
   }
 
-  void setCalibration(int xMin, int xCen, int xMax, int yMin, int yCen, int yMax){
+  void setCalibration(int xMin, int xMinDZ, int xMaxDZ, int xMax, int yMin, int yMinDZ, int yMaxDZ, int yMax){
     cal.x_min = xMin;
-    cal.x_center = xCen;
+    cal.x_min_dead = xMinDZ;
+    cal.x_max_dead = xMaxDZ;
     cal.x_max = xMax;
     
     cal.y_min = yMin;
-    cal.y_center = yCen;
+    cal.y_min_dead = yMinDZ;
+    cal.y_max_dead = yMaxDZ;
     cal.y_max = yMax;
     
     updateHalfRange();
@@ -198,6 +198,7 @@ public:
   // Clears the calibration and sets the center point to the current value
   // Averaged over ~25ms
   // TODO: Use temporary struct for calibration
+  // TODO: Add ability to calibrate dead zone, somehow
   void clearCalibration(){
     int joyXRaw = 0, joyYRaw = 0;
     for (int i = 0; i < 8; i++){
@@ -207,7 +208,7 @@ public:
     }
     joyXRaw /= 8;
     joyYRaw /= 8;
-    setCalibration(joyXRaw, joyXRaw, joyXRaw, joyYRaw, joyYRaw, joyYRaw);
+    setCalibration(joyXRaw, cal.x_min_dead, cal.x_max_dead, joyXRaw, joyYRaw, cal.y_min_dead, cal.y_max_dead, joyYRaw);
     isCalibrating = true;
   }
 
@@ -225,27 +226,9 @@ public:
   void saveCalibration(){
     isCalibrating = false;
     updateHalfRange();
-    cal.checksum = Fletcher16((uint8_t*)(&cal), 12);
+    cal.checksum = Fletcher16((uint8_t*)(&cal), 20);
 
     // TODO: Save to EEPROM
-Serial.print("X Min = ");
-Serial.println(cal.x_min);
-Serial.print("X Ctr = ");
-Serial.println(cal.x_center);
-Serial.print("X Max = ");
-Serial.println(cal.x_max);
-
-Serial.print("Y Min = ");
-Serial.println(cal.y_min);
-Serial.print("Y Ctr = ");
-Serial.println(cal.y_center);
-Serial.print("Y Max = ");
-Serial.println(cal.y_max);
-
-Serial.print("Checksum = ");
-Serial.println( cal.checksum );
-
-
   }
   
   void update(){
@@ -257,14 +240,23 @@ Serial.println( cal.checksum );
     
     int joyXRaw = analogRead(x_pin);
     int joyYRaw = analogRead(y_pin);
+    double joyX, joyY;
     
-    // map the values (x values. Joystick below neutral position)
-    double joyX = (joyXRaw-cal.x_center)/x_half_range;
-    double joyY = (joyYRaw-cal.y_center)/y_half_range;
+    if (joyXRaw <= cal.x_min_dead){
+      joyX = (double)(joyXRaw - cal.x_min_dead)/cal.x_low_range;
+    } else if (joyXRaw >= cal.x_max_dead){
+      joyX = (double)(joyXRaw - cal.x_max_dead)/cal.x_high_range;
+    } else {
+      joyX = 0.0;
+    }
     
-    // Zero joystick if in dead zone
-    if (abs(joyX) < joyXDeadLimit) joyX = 0;
-    if (abs(joyY) < joyYDeadLimit) joyY = 0;
+    if (joyYRaw <= cal.y_min_dead){
+      joyY = (double)(joyYRaw - cal.y_min_dead)/cal.y_low_range;
+    } else if (joyYRaw >= cal.y_max_dead){
+      joyY = (double)(joyYRaw - cal.y_max_dead)/cal.y_high_range;
+    } else {
+      joyY = 0.0;
+    }
   
     // Run averaging
     joyXBuffered.append(joyX);
@@ -309,19 +301,27 @@ private:
   
   struct Calibration {
     int16_t x_min;
-    int16_t x_center;
+    int16_t x_low_range;
+    int16_t x_min_dead;
+    int16_t x_max_dead;
+    int16_t x_high_range;
     int16_t x_max;
       
     int16_t y_min;
-    int16_t y_center;
+    int16_t y_low_range;
+    int16_t y_min_dead;
+    int16_t y_max_dead;
+    int16_t y_high_range;
     int16_t y_max; 
     
     int16_t checksum; 
   } cal;
   
   void updateHalfRange(){
-    x_half_range = ( (cal.x_center-cal.x_min) > (cal.x_max-cal.x_center) ) ? (cal.x_center-cal.x_min) : (cal.x_max-cal.x_center);
-    y_half_range = ( (cal.y_center-cal.y_min) > (cal.y_max-cal.y_center) ) ? (cal.y_center-cal.y_min) : (cal.y_max-cal.y_center);
+    cal.x_low_range  = cal.x_min_dead - cal.x_min;
+    cal.x_high_range = cal.x_max - cal.x_max_dead;
+    cal.y_low_range  = cal.y_min_dead - cal.y_min;
+    cal.y_high_range = cal.y_max - cal.y_max_dead;
   }
 
 // https://en.wikipedia.org/wiki/Fletcher%27s_checksum#Straightforward

@@ -14,7 +14,7 @@ from math import atan2, sqrt, pi, atan
 # FIXME: Should load this from a parameter file
 # Max speed in mm/s
 TYCHO_MAX_SPEED = 1000.0
-TYCHO_MAX_FWD_SPEED = 2000.0 # Front-wheel-drive mode speed limit
+TYCHO_MAX_FWD_SPEED = 3000.0 # Front-wheel-drive mode speed limit
 TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 1
 TYCHO_MAX_SPIN_SPEED = 1000.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
@@ -155,22 +155,15 @@ class JoyToCommand:
                 #TODO: Apply an exponential remapping here?
                 # Nah, probably better to do so in the various Interpret functions
                 # https://www.chiefdelphi.com/t/paper-joystick-sensitivity-gain-adjustment/107280/3
-                # joystick_exp_gain = 0.6   # Range [0-1]
-                # x = joystick_exp_gain*(x**3) + (1-joystick_exp_gain)*x
+                if key == "joyXAxis": # X is drive, Y is steering
+                  joystick_exp_gain = 0.6   # Range [0-1]
+                  newdata = joystick_exp_gain*(newdata**3) + (1-joystick_exp_gain)*newdata
                 # See also https://www.chiefdelphi.com/t/paper-joystick-sensitivity-gain-adjustment/107280/12
                 # for possible use in the normal steering mode to tweak minimum turning arc
             else:
                 newdata = (data.buttons[ self.buttonMap[key] ] == 1)
             #
-            # Extra deadzone for the steering axis in normal drive mode
-            if self.steeringMode == DriveMode.NORMAL or self.steeringMode == DriveMode.FRONT_STEER:
-                if key == "joyXAxis" and newdata != 0 and abs(newdata - self.joyState[key]) < NORMAL_JOYX_DEADZONE:
-                    return False
-                #
-                if key == "joyYAxis" and abs(newdata) < 0.1:
-                    newdata = 0.0
-                #
-            #
+            
             if self.joyState[key] != newdata:
                 self.joyState[key] = newdata
                 return True
