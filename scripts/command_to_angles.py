@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from tycho.msg import RoverDriveCommand, WheelAnglesSpeeds
-from math import atan, atan2, sqrt, pi
+from math import atan, atan2, sqrt, pi, sin, cos
 
 # Author: Robert Wagner
 TYCHO_MAX_WHEEL_SPEED = 4200; # mm/s # FIXME: This should be pulled from a config file
@@ -40,7 +40,8 @@ class CommandToAngles:
         #####################
         
         self.maxWheelSpeed = TYCHO_MAX_WHEEL_SPEED
-        self.steerRate = 500.0 # Servo nominally rotates at 500deg/sec
+        self.steerRate = 36.0 # Approximate speed of steering motors in deg/sec
+        # TODO: Should use the time-to-destination to tweak speeds?
         # +X is forward, +Y is left, numbers in scale meters
         # TODO: Load these from ROS parameter server
         # self.jointX = rospy.get_param("/tycho/joint_x_positions")
@@ -76,24 +77,12 @@ class CommandToAngles:
         """
         
         """
-        print("callback speed=%f"%data.speed)
+        #print("callback speed=%f"%data.speed)
         
         if data.is_braking:
             self.speed = 0
             self.setVehicleSpeed(self.speed) #!!!
             self.createAndPublishCommandMessage() #!!!
-            return
-        #
-        
-        # FIXME: Horrible hack to activate tank steering mode
-        if data.is_strafing and data.strafing_angle == 720.0 and data.turn_center_x == 720.0:
-            if (data.speed != self.speed or data.turn_center_y != self.turnY):
-                self.speed = data.speed
-                self.turnY = data.turn_center_y
-                self.isStrafing = True
-                self.strafingAngle = 0.0
-                self.setAnglesAndSpeedsTank(self.speed, self.turnY)
-                self.createAndPublishCommandMessage()
             return
         #
         
@@ -155,30 +144,14 @@ class CommandToAngles:
         self.speedMultipliers['BackRight']  = 1.0
   
         #setVehicleSpeed(currentSpeed);
+        #return self.setToeInAngles(angle);
+        # TODO: Maybe try to get the fancy version working, as it should be better for weird angles
+        toein = 1.5
+        if self.speed > 0: # Reverse
+            toein = -toein
+        #
         
-        return self.setSteeringAngles(angle, angle, angle, angle);
-    #
-    
-    
-    # Set the steering angle to put all wheels pointing forward
-    # Changes speed multipliers based on joystick value and desired speed to do tank turning
-    # Offical "desired speed" should be set to 1
-    def setAnglesAndSpeedsTank(self, speed, turn_speed_adjust):
-        left_speed = speed - turn_speed_adjust
-        right_speed = speed + turn_speed_adjust
-        if left_speed > self.maxWheelSpeed: left_speed = self.maxWheelSpeed
-        if left_speed < -self.maxWheelSpeed: left_speed = -self.maxWheelSpeed
-        if right_speed > self.maxWheelSpeed: right_speed = self.maxWheelSpeed
-        if right_speed < -self.maxWheelSpeed: right_speed = -self.maxWheelSpeed
-        
-        self.speedMultipliers['FrontLeft']  = left_speed
-        self.speedMultipliers['FrontRight'] = right_speed
-        self.speedMultipliers['BackLeft']   = left_speed
-        self.speedMultipliers['BackRight']  = right_speed
-        
-        time = self.setSteeringAngles(0, 0, 0, 0)
-        self.setVehicleSpeed(1.0)
-        return time
+        return self.setSteeringAngles(angle+toein, angle-toein, angle+toein, angle-toein);
     #
     
     #// Commands the steering servos to go to appropriate angles for the vehicle to turn
@@ -239,6 +212,33 @@ class CommandToAngles:
         # Actually command the servos
         return self.setSteeringAngles(angles['FrontLeft']-90, angles['FrontRight']-90,
                                       angles['BackLeft']-90, angles['BackRight']-90);
+    #
+    
+    
+    # Set the steering angle to put all wheels sub-parallel at the specified angle
+    # Angles wheels to point towards a point 50m away in the desired direction
+    # TODO: Use speed +/- to switch toe-in direction (center x/y sign)
+    # Valid angles go from -90 to +90, with 0 being straight ahead and +90 being to the left
+    # (+X is forward, +Y is left, units in cm)
+    # Returns estimated time until the wheels reach the target angles in ms.
+    def setToeInAngles(self, angle):
+        turnCenterX = 50*sin(angle*pi/180);
+        turnCenterY = 50*cos(angle*pi/180);
+        angles = {};
+        turnPointDistance = sqrt(turnCenterX*turnCenterX + turnCenterY*turnCenterY);
+        maxMultiplier = 0.0;
+        
+        for i in ['FrontLeft','FrontRight','BackLeft','BackRight']:
+            distY = turnCenterY-self.jointY[i];
+            distX = turnCenterX-self.jointX[i];
+            angles[i] = atan(distX/distY)*180/pi+90;
+            
+            self.speedMultipliers[i] = 1.0;
+        #
+        print(angles)
+        # Actually command the servos
+        return self.setSteeringAngles(angles['FrontLeft']+0, angles['FrontRight']+0,
+                                      angles['BackLeft']+0, angles['BackRight']+0);
     #
 
     
