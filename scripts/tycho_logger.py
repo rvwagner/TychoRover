@@ -4,6 +4,7 @@ import rospy
 from tycho.msg import WheelAnglesSpeeds
 from tycho.msg import WheelStatus
 from tycho.msg import RoverDriveCommand
+from tycho.msg import PowerMonitor
 from sensor_msgs.msg import Joy
 from std_msgs.msg import Float32MultiArray
 from std_msgs.msg import Int16
@@ -38,11 +39,35 @@ class JoyLogger:
     #
 #
 
+class PowerMonitorLogger:
+    def __init__(self, directory):
+        rospy.Subscriber("/tycho/power_monitor", PowerMonitor, self.log, queue_size=100)
+        self.file = open("%s/console_power_log.txt"%directory, 'w', buffering=1)
+        self.file.write("date, Battery_1_V, Battery_2_V, Battery_3_V, Battery_4_V, 12V_V, 5V_V, Master_A, Front_Relay_A, Rear_Relay_A, Display_A, 12V_A, 5V_A")
+    #
+    
+    def closeout(self):
+        self.file.close()
+    #
+    
+    def add_flag(self, id):
+        t = datetime.datetime.today().strftime("%Y-%m-%d %H:%M:%S.%f")
+        self.file.write("%s  FLAGGED EVENT %d\n"%(t,id))
+    #
+    
+    def log(self, msg):
+        dt = datetime.datetime.fromtimestamp(msg.header.stamp.to_time())
+        timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+        self.file.write("%s, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f, %5.2f\n"%(timestamp, msg.battery_1_v, msg.battery_2_v, msg.battery_3_v, msg.battery_4_v, msg.panel_12v_v, msg.panel_5v_v, msg.master_a, msg.front_relay_a, msg.rear_relay_a, msg.panel_display_a, msg.panel_12v_a, msg.panel_5v_a))
+    #
+#
+
+
 class RoverDriveCommandLogger:
     def __init__(self, directory):
-        rospy.Subscriber("tycho/high_level_motor_values", RoverDriveCommand, self.log, queue_size=100)
+        rospy.Subscriber("/tycho/final_commands", RoverDriveCommand, self.log, queue_size=100)
         self.file = open("%s/high_level_command_log.txt"%directory, 'w', buffering=1)
-        self.file.write("date, speed, turn_center_x, turn_center_y, strafing_angle, is_strafing, is_braking")
+        self.file.write("date, speed, turn_center_x, turn_center_y, strafing_angle, is_strafing, is_braking\n")
     #
     
     def closeout(self):
@@ -160,6 +185,7 @@ wsl = WheelStatusLogger(logdir)
 rdcl = RoverDriveCommandLogger(logdir)
 wasl = WheelAnglesSpeedsLogger(logdir)
 jl = JoyLogger(logdir)
+pml = PowerMonitorLogger(logdir)
 
 event_id = 1;
 def add_flag(msg):
@@ -168,13 +194,12 @@ def add_flag(msg):
     rdcl.add_flag(event_id)
     wasl.add_flag(event_id)
     jl.add_flag(event_id)
+    pml.add_flag(event_id)
     print("FLAG EVENT %d"%event_id)
     event_id += 1
 #
 
 rospy.Subscriber("tycho/log_flag", Int16, add_flag, queue_size=1)
-
-
 
 print ("Starting main loop")
 rate = rospy.Rate(1) # Hz
@@ -186,3 +211,4 @@ wsl.closeout()
 rdcl.closeout()
 wasl.closeout()
 jl.closeout()
+pml.closeout()
