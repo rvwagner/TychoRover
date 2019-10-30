@@ -21,8 +21,6 @@ TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
 TYCHO_MAX_ACCEL = 2000.0 # in mm/s^2, primarily used for gentle braking
 
-TANK_STEER_SPEED = 500.0 # Maximum speed adjustment for tank steering
-
 TYCHO_MINIMUM_TURN_RADIUS = 1
 
 TYCHO_DEFAULT_CIRCLE_STRAFE_DISTANCE = 2.5
@@ -287,7 +285,6 @@ class JoyToCommand:
             
         elif self.steeringMode == DriveMode.FRONT_STEER:
             self.interpretNormal(True)
-            #self.interpretTank()
             
         else:
             self.interpretStop()
@@ -477,31 +474,6 @@ class JoyToCommand:
         #
         
         self.updateFullMessage(speed, turnX=self.circleStrafeDistance, turnY=0, strafeAngle=0, isStrafing=False, isBraking=False);
-        self.publishCommandMessage()
-    #
-    
-    # Drive straight, use tank-tyle steering
-    # This violates so many of the assumptions of this drive code....
-    def interpretTank(self):
-        print('Using interpretTankSteer()')
-        self.strafeAngle = 720.0 # FIXME: Horrible hack to signal "tank mode" to command-to-angles
-        self.turnX = 720.0 # If both turnX and strafeAngle are 720, do tank mode where turnY is steerign speed modifier
-        self.isBraking = False
-        
-        # Set speed
-        self.target_speed = self.scaleAndLimitSpeed(self.joyState['joyYAxis'], TYCHO_MAX_SPEED)
-        print ("Limited %.2f to %.2f: %.2f"%(self.joyState['joyYAxis'], TYCHO_MAX_SPEED, self.target_speed) )
-        
-        # Set steering values depending on joystick left/right axis
-        self.turnY = self.scaleAndLimitSpeed(self.joyState['joyXAxis'], TANK_STEER_SPEED)
-        self.isStrafing = True
-        
-        # Block backwards driving if reverse mode is off
-        if self.target_speed < 0 and not self.canReverse:
-            self.isBraking = True # Should this exist?
-            self.target_speed = 0.0
-        #
-        
         self.publishCommandMessage()
     #
     
