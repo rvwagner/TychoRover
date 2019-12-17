@@ -33,7 +33,7 @@ class EndStatus(Enum):
     FRONT_ONLY = "FRONT_ONLY"
     BACK_ONLY = "BACK_ONLY"
 #
-TYCHO_DRIVE_END_STATUS = EndStatus.FRONT_ONLY
+TYCHO_DRIVE_END_STATUS = EndStatus.BOTH
 
 
 
