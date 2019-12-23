@@ -27,6 +27,12 @@ Requires that the [Arduino][] IDE be installed: `sudo apt-get install arduino`
 - (if using SocketCAN) [can-utils][]: `sudo apt install can-utils`
 - (if using SocketCAN) slcan kernel module, if not already built [instructions](https://wiki.linklayer.com/index.php/CANtact_on_Raspberry_Pi).
 
+The CANard module requires Python 3 (todo: figure out why), while the default ROS Python support in Kinetic is Python 2.  You may need to specially install Python 3 moduels for ROS:
+
+    `sudo apt-get install python3-catkin-pkg-modules`
+
+    `sudo apt-get install python3-rospkg-modules`
+
 ### Firefox
 
 The GUI requires Firefox.  Unfortunately, Firefox 53 and later are broken on Raspberry Pi MATE Ubuntu.  To install, first uninstall Firefox, then download and install version 52:
