@@ -128,7 +128,7 @@ $(document).ready(function() {
           units: "Amps",
           maxValue: 160,
           minValue: 0,
-          rangeHighWarning: 100,
+          rangeHighWarning: 80,
           rangeHighError: 130,
           rangeLowWarning: null,
           rangeLowError: null,
@@ -488,31 +488,33 @@ $(document).ready(function() {
     $("#wssAngle" + wheelConversion[msg.wheel_id])
       .html(msg.steering_angle.integer() + '&deg;');
 
+    // FIXME: Restore message reading, check values
+    // And is the ".integer()" a good idea?
     metric.wheelStatus.steering.amps[wheelConversion[msg.wheel_id.integer()]]
-      .gaugeID.value = msg.steering_amps;
+      .gaugeID.value = 5; //msg.steering_amps;
     metric.wheelStatus.steering.temp[wheelConversion[msg.wheel_id.integer()]]
-      .gaugeID.value = msg.steering_temp;
+      .gaugeID.value = 45; //msg.steering_temp;
     metric.wheelStatus.drive.amps[wheelConversion[msg.wheel_id.integer()]]
-      .gaugeID.value = msg.drive_amps;
+      .gaugeID.value = 30; //msg.drive_amps;
     metric.wheelStatus.drive.temp[wheelConversion[msg.wheel_id.integer()]]
-      .gaugeID.value = msg.drive_temp;
+      .gaugeID.value = 55; //msg.drive_temp;
     metric.wheelStatus.drive.rpm[wheelConversion[msg.wheel_id.integer()]]
-      .gaugeID.value = msg.drive_rpm;
+      .gaugeID.value = 1; //msg.drive_rpm;
   }
 
-  function updatePower(msg) {
-    metric.powerStatus.volts.battery_1.gaugeID.value = msg[metric.powerStatus.volts.battery_1.name];
-    metric.powerStatus.volts.battery_2.gaugeID.value = msg[metric.powerStatus.volts.battery_2.name];
-    metric.powerStatus.volts.battery_3.gaugeID.value = msg[metric.powerStatus.volts.battery_3.name];
-    metric.powerStatus.volts.battery_4.gaugeID.value = msg[metric.powerStatus.volts.battery_4.name];
-    metric.powerStatus.volts.panel_12v.gaugeID.value = msg[metric.powerStatus.volts.panel_12v.name];
-    metric.powerStatus.volts.panel_5v.gaugeID.value = msg[metric.powerStatus.volts.panel_5v.name];
-    metric.powerStatus.amps.master.gaugeID.value = msg[metric.powerStatus.amps.master.name];
-    metric.powerStatus.amps.front_relay.gaugeID.value = msg[metric.powerStatus.amps.front_relay.name];
-    metric.powerStatus.amps.rear_relay.gaugeID.value = msg[metric.powerStatus.amps.rear_relay.name];
-    metric.powerStatus.amps.panel_display.gaugeID.value = msg[metric.powerStatus.amps.panel_display.name];
-    metric.powerStatus.amps.panel_12v.gaugeID.value = msg[metric.powerStatus.amps.panel_12v.name];
-    metric.powerStatus.amps.panel_5v.gaugeID.value = msg[metric.powerStatus.amps.panel_5v.name];
+  function updatePower(msg) { // FIXME: Restore message reading, check values
+    metric.powerStatus.volts.battery_1.gaugeID.value = 13.2; //msg[metric.powerStatus.volts.battery_1.name];
+    metric.powerStatus.volts.battery_2.gaugeID.value = 13.2; //msg[metric.powerStatus.volts.battery_2.name];
+    metric.powerStatus.volts.battery_3.gaugeID.value = 13.2; //msg[metric.powerStatus.volts.battery_3.name];
+    metric.powerStatus.volts.battery_4.gaugeID.value = 13.2; //msg[metric.powerStatus.volts.battery_4.name];
+    metric.powerStatus.volts.panel_12v.gaugeID.value = 13.2; //msg[metric.powerStatus.volts.panel_12v.name];
+    metric.powerStatus.volts.panel_5v.gaugeID.value  = 5.2; //msg[metric.powerStatus.volts.panel_5v.name];
+    metric.powerStatus.amps.master.gaugeID.value = 3; //msg[metric.powerStatus.amps.master.name];
+    metric.powerStatus.amps.front_relay.gaugeID.value = 0.5; //msg[metric.powerStatus.amps.front_relay.name];
+    metric.powerStatus.amps.rear_relay.gaugeID.value = 0.5; //msg[metric.powerStatus.amps.rear_relay.name];
+    metric.powerStatus.amps.panel_display.gaugeID.value = 1.1; //msg[metric.powerStatus.amps.panel_display.name];
+    metric.powerStatus.amps.panel_12v.gaugeID.value = 2.1; //msg[metric.powerStatus.amps.panel_12v.name];
+    metric.powerStatus.amps.panel_5v.gaugeID.value = 0.9; //msg[metric.powerStatus.amps.panel_5v.name];
   }
 
   function updateJoyStick(msg) {
