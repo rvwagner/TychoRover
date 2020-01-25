@@ -13,10 +13,10 @@ from math import atan2, sqrt, pi, atan
 
 # FIXME: Should load this from a parameter file
 # Max speed in mm/s
-TYCHO_MAX_SPEED = 1000.0
-TYCHO_MAX_FWD_SPEED = 3000.0 # Front-wheel-drive mode speed limit
-TYCHO_MAX_STRAFE_SPEED = TYCHO_MAX_SPEED / 1
-TYCHO_MAX_SPIN_SPEED = 1000.0
+TYCHO_MAX_SPEED = 2000.0
+TYCHO_MAX_FWD_SPEED = 2200.0 # Front-wheel-drive mode speed limit
+TYCHO_MAX_STRAFE_SPEED = 1000.0
+TYCHO_MAX_SPIN_SPEED = 2200.0
 TYCHO_MAX_CIRCLE_STRAFE_SPEED = TYCHO_MAX_STRAFE_SPEED
 
 TYCHO_MAX_ACCEL = 2000.0 # in mm/s^2, primarily used for gentle braking
@@ -348,9 +348,9 @@ class JoyToCommand:
         #
         
         # Block backwards driving if reverse mode is off
-        if self.target_speed < 0 and not self.canReverse:
-            self.isBraking = True # Should this exist?
-            self.target_speed = 0.0
+        #if self.target_speed < 0 and not self.canReverse:
+        #    self.isBraking = True # Should this exist?
+        #    self.target_speed = 0.0
         #
         
         # Rotate the steering axis so that strafeAngle is forward
