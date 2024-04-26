@@ -266,7 +266,10 @@ def clearESTOP(node):
 
 
 def new_command_callback(data):
+    # DEBUG
     # print("Recieved command: %.2f mm/s at %.1f deg"%(data.back_left_speed, data.back_left_angle))
+    print("Command speed (ms): % 6.3f   % 6.3f   % 6.3f   % 6.3f"%(data.front_left_speed/1000,data.front_right_speed/1000,data.back_left_speed/1000,data.back_right_speed/1000))
+    
     canable.sendFrame(canable.buildRPDO(frontLeftID, 1, round(data.front_left_speed * speedMultiplier), round(data.front_left_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(frontRightID, 1, round(data.front_right_speed * speedMultiplier), round( data.front_right_angle * angleMultiplier)))
     canable.sendFrame(canable.buildRPDO(backLeftID, 1, round(data.back_left_speed * speedMultiplier), round(data.back_left_angle * angleMultiplier)))
@@ -300,9 +303,13 @@ def handleTPDO(index, node, data1, data2):
     
     if ready_to_send[node] == 0xF:
         wheel_statuses[node].header.stamp = rospy.Time.now()
-        if node == 2:
+        # DEBUG
+        #print("Amps (1,2,3,4): % 6.1f   % 6.1f   % 6.1f   % 6.1f"%(wheel_statuses[1].drive_amps, wheel_statuses[2].drive_amps,  wheel_statuses[3].drive_amps,  wheel_statuses[4].drive_amps))
+        #print("Real speed (m/s): % 6.1f   % 6.1f   % 6.1f   % 6.1f"%(wheel_statuses[1].drive_rpm, wheel_statuses[2].drive_rpm,  wheel_statuses[3].drive_rpm,  wheel_statuses[4].drive_rpm))
+        if node == 4:
+            pass
             # Drive/steer coord debugging data
-            print("Node %d: D: % 6.1f mm/s  % 6.1f A  % 8d ticks  % 6.1f C  S: % 6.1f A  % 6.1f C  MC: % 6.1f C Flags ..."%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_amps, wheel_statuses[node].steering_temp, wheel_statuses[node].controller_temp))
+            #print("Node %d: D: % 6.2f m/s  % 6.1f A  % 8d ticks  % 6.1f C  S: % 6.1f A  % 6.1f deg  MC: % 6.1f C Flags ..."%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_amps, wheel_statuses[node].steering_angle, wheel_statuses[node].controller_temp))
             
             #print("Publishing %d: % 6.1f % 6.1f % 8d % 6.1f % 6.1f % 6.1f % 6.1f % 6.1f"%(node, wheel_statuses[node].drive_rpm, wheel_statuses[node].drive_amps, wheel_statuses[node].drive_spin_count, wheel_statuses[node].controller_temp, wheel_statuses[node].steering_angle, wheel_statuses[node].steering_amps, wheel_statuses[node].drive_temp, wheel_statuses[node].steering_temp))
         statuspub.publish(wheel_statuses[node])

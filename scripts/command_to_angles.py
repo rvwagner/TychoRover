@@ -47,15 +47,19 @@ class CommandToAngles:
         # self.jointX = rospy.get_param("/tycho/joint_x_positions")
         # self.jointX = rospy.get_param("/tycho/joint_y_positions")
         # self.jointX = rospy.get_param("/tycho/steering_arm_lengths")
-        self.jointX = {'FrontLeft': 1.17, 'FrontRight': 1.17,
-                       'BackLeft': -1.17, 'BackRight': -1.17}
-        self.jointY = {'FrontLeft': 0.635, 'FrontRight': -0.635,
-                       'BackLeft':  0.635, 'BackRight':  -0.635}
+        width = 1.27 # Old code values
+        length = 2.34
+        width = 1.115 # Exact physical measure
+        length = 2.62 # rough physical measure
+        self.jointX = {'FrontLeft': length/2, 'FrontRight': length/2,
+                       'BackLeft': -length/2, 'BackRight': -length/2}
+        self.jointY = {'FrontLeft': width/2, 'FrontRight': -width/2,
+                       'BackLeft':  width/2, 'BackRight':  -width/2}
         self.steeringArmLength = { # Pivot to center of tire
                                     'FrontLeft':  0.31115,
                                     'FrontRight': 0.31115,
-                                    'BackLeft':   0.273,
-                                    'BackRight':  0.273}
+                                    'BackLeft':   0.31115,
+                                    'BackRight':  0.31115}
         
         # System to rate-limit messages
         self.hasNewMessage = False
@@ -192,7 +196,12 @@ class CommandToAngles:
             if self.speedMultipliers[i] > maxMultiplier:
                 maxMultiplier = self.speedMultipliers[i];
         #
-      
+        
+        #angles['FrontLeft'] += 10
+        #angles['FrontRight'] += 0
+        #angles['BackLeft'] += -35
+        #angles['BackRight'] += 30
+        #
         # If turn point is interior to wheels, adjust multipliers to:
         # A) Max out at 1.0
         # B) Reverse the left-hand wheels

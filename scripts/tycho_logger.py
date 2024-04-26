@@ -145,9 +145,9 @@ class WheelStatusLogger:
         timestamp = dt.strftime("%Y-%m-%d %H:%M:%S.%f")
         # Drive/steer coord debugging data
         #self.nodefilelist[node-1].write("%s  Node %d: Drive: %08X -> % 6.0f = % 6.0f; Steer: t % 6.0f = m % 6.0f ? cmd % 6.0f act % 6.0f\n"%(timestamp, node, int(msg.drive_rpm), msg.drive_amps, msg.drive_spin_count, msg.controller_temp, msg.steering_temp, msg.steering_amps, msg.drive_temp))
-        self.nodefilelist[node-1].write("%s  Node %d: D: % 6.1f mm/s  % 6.1f A  % 8d ticks  % 6.1f C  S: % 6.1f A  % 6.1f C  MC: % 6.1f C Flags ..."%(timestamp, node, msg.drive_rpm, msg.drive_amps, msg.drive_spin_count, msg.drive_temp, msg.steering_amps, msg.steering_temp, msg.controller_temp))
+        self.nodefilelist[node-1].write("%s  Node %d: D: % 6.1f mm/s  % 6.1f A  % 8d ticks  % 6.1f drg  S: % 6.1f A  % 6.1f C  MC: % 6.1f C Flags ...\n"%(timestamp, node, msg.drive_rpm, msg.drive_amps, msg.drive_spin_count, msg.drive_temp, msg.steering_amps, msg.steering_angle, msg.controller_temp))
         if node == 2: #print("Node %d: Drive: %08X -> % 6.0f = % 6.0f; Steer: t % 6.0f = m % 6.0f ? cmd % 6.0f act % 6.0f\n"%(node, int(msg.drive_rpm), msg.drive_amps, msg.drive_spin_count, msg.controller_temp, msg.steering_temp, msg.steering_amps, msg.drive_temp))
-            print("%s  Node %d: D: % 6.1f mm/s  % 6.1f A  % 8d ticks  % 6.1f C  S: % 6.1f A  % 6.1f C  MC: % 6.1f C Flags ..."%(timestamp, node, msg.drive_rpm, msg.drive_amps, msg.drive_spin_count, msg.drive_temp, msg.steering_amps, msg.steering_temp, msg.controller_temp))
+            print("%s  Node %d: D: % 6.1f mm/s  % 6.1f A  % 8d ticks  % 6.1f C  S: % 6.1f A  % 6.1f deg  MC: % 6.1f C Flags ...\n"%(timestamp, node, msg.drive_rpm, msg.drive_amps, msg.drive_spin_count, msg.drive_temp, msg.steering_amps, msg.steering_angle, msg.controller_temp))
     #
 #
 

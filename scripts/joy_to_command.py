@@ -39,6 +39,8 @@ TYCHO_DRIVE_END_STATUS = EndStatus.BOTH
 
 NORMAL_JOYX_DEADZONE = 0.20 # In normal mode, joystick must move this much from [current position] to register as a change
 
+JOY_DEADZONE = 0.05
+
 class DriveMode(Enum):
     STOP = 0
     NORMAL = 1
@@ -102,6 +104,10 @@ class JoyToCommand:
     
     # Use the time since the last update to accelerate towards the target speed
     def update_speed(self):
+        # Short-circuiting for now, might cut the function entirely
+        self.actual_speed = self.target_speed
+        return
+        
         # Always update the timestamp
         new_time = rospy.Time.now()
         delta_time = (new_time - self.lastSpeedUpdateTime).to_sec()
@@ -114,25 +120,25 @@ class JoyToCommand:
         # If a change is needed, apply it
         # TODO: Move these to a parameter file
         max_accel = 4000.0
-        if self.target_speed == 0: # Reduce accel limit when approaching 0
-            if abs(self.actual_speed) < 30: # Remember: speeds are in mm/s, not m/s!
-                max_accel = 30.0
-            elif abs(self.actual_speed) < 100:
-                max_accel = 100.0
-            elif abs(self.actual_speed) < 1000:
-                max_accel = 2000.0
+       # if self.target_speed == 0: # Reduce accel limit when approaching 0
+       #     if abs(self.actual_speed) < 30: # Remember: speeds are in mm/s, not m/s!
+       #         max_accel = 50.0
+       #     elif abs(self.actual_speed) < 300:
+       #         max_accel = 500.0
+       #     elif abs(self.actual_speed) < 1000:
+       #         max_accel = 2000.0
         #
         max_delta = max_accel * delta_time
         
-        print(self.actual_speed, self.target_speed, delta_time, max_delta, delta_speed)
+        #print(self.actual_speed, self.target_speed, delta_time, max_delta, delta_speed)
         
-        if abs(delta_speed) < max_delta: # Don't need the max accel to reach target
-            self.actual_speed = self.target_speed
+        #if abs(delta_speed) < max_delta: # Don't need the max accel to reach target
+        #    self.actual_speed = self.target_speed
+        #else:
+        if delta_speed < 0:
+            self.actual_speed -= max_delta
         else:
-            if delta_speed < 0:
-                self.actual_speed -= max_delta
-            else:
-                self.actual_speed += max_delta
+            self.actual_speed += max_delta
         #
         return
     #
@@ -150,6 +156,9 @@ class JoyToCommand:
         def updateValueIfNeeded(key, isAxis=False):
             if isAxis:
                 newdata = data.axes[ self.buttonMap[key] ]
+                if abs(newdata) < JOY_DEADZONE:
+                    newdata = 0
+                #
                 #TODO: Apply an exponential remapping here?
                 # Nah, probably better to do so in the various Interpret functions
                 # https://www.chiefdelphi.com/t/paper-joystick-sensitivity-gain-adjustment/107280/3
@@ -504,7 +513,7 @@ class JoyToCommand:
         m.strafing_angle = self.strafeAngle
         m.is_strafing    = self.isStrafing
         m.is_braking     = self.isBraking
-        # print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.actual_speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
+        print("%.2f, (%.1f,%.1f), %.0f %s %s"%(self.actual_speed, self.turnX, self.turnY, self.strafeAngle, self.isStrafing, self.isBraking))
         
         self.pub.publish(m)
     #
