@@ -1,9 +1,7 @@
 
 /tycho/speeds/
-max_wheel: # Maximum speed of a single wheel
-
-# FIXME: Should load this from a parameter file
 # Max speeds in mm/s; accelerations are in mm/s^2
+max_wheel:    4500.0 # Maximum speed of a single wheel
 max_normal:   1000.0 # Max speed for normal driving mode # TYCHO_MAX_SPEED
 max_fwd:      2000.0 # Front-wheel-drive mode speed limit
 max_strafe:   1000.0 # Max speed in normal strafing mode
