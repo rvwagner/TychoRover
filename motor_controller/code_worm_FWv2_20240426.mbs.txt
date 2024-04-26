@@ -1,0 +1,534 @@
+' Tycho Motor Control Code
+' For firmware version 2.1
+' NOTE: All #defines must come before any line of code
+
+' TODO: General overview of ho the system works
+' - Commands come in on auto-read RPDO commands
+' etc.
+
+#define STEER_BRAKE_PIN 2
+#define DRIVE_BRAKE_PIN 1
+#define BRAKES_ON _D0
+#define BRAKES_OFF _D1
+#define DRIVE_CHANNEL 1
+#define STEER_CHANNEL 2
+
+#define DRIVE_TEMP_INPUT 4
+#define STEER_TEMP_INPUT 5
+#define STEER_POT_INPUT 5
+
+#define OUTER_LIMIT_INPUT 3
+
+' Steer dead zones,microdegrees: 1000000 = 1 degrees
+#define Steering_Brake_Dead_Zone 1000000 ' 1.0 deg
+#define Steering_Move_Dead_Zone   500000 ' 0.5 deg
+
+' TODO: Might need more tuning
+#define Minimum_Steering_Power 150 ' Minimum to move wheel with unlock drive is ~90
+
+'''''''''''''
+' CAN SETUP '
+'''''''''''''
+
+' CAN input variables
+#define COMMANDED_SPEED_VAR 9
+#define COMMANDED_ANGLE_VAR 10
+#define SPEED_SCALE_FACTOR_INPUT_VAR 11
+#define MASTER_IS_ALIVE_VAR 12
+
+#define AUX1_VAR 13
+#define AUX2_VAR 14
+#define AUX3_VAR 15
+#define NEW_AUX 16
+
+#define AUX_OPTION_DRIVE_PID 1
+#define AUX_OPTION_STEER_PID 2
+#define AUX_OPTION_STEER_MANUAL_PID 4
+
+#define AUX_OPTION_RESTART_SCRIPT 10
+
+
+#define DATA_SEND_RATE 200
+#define WATCHDOG_TIMEOUT 500
+#define REPORT_TIMER 1
+#define WATCHDOG_TIMER 2
+
+''''''''''''''''''''''''''''
+' INITIALIZE COMMUNICATION '
+''''''''''''''''''''''''''''
+
+SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+
+' Do a weird song-and-dance to get the CAN bus to actually start
+SetConfig(_CAS, 1)       ' Autostart CANopen on boot (does not work?)
+SetConfig(_CEN, 2)       ' Start miniCAN 
+wait(10)
+' FIXME: This is a dirty hack, I think I actually need an activation packet on the CAN bus
+' In theory these lines duplicate pre-set config values
+SetConfig(_CEN, 1)       ' Start CANopen
+SetConfig(_CTPS, 1, DATA_SEND_RATE) ' Send VAR1,2 every X ms
+SetConfig(_CTPS, 2, DATA_SEND_RATE) ' Send VAR3,4 every X m
+SetConfig(_CTPS, 3, DATA_SEND_RATE) ' Send VAR5,6 every X ms
+SetConfig(_CTPS, 4, DATA_SEND_RATE) ' Send VAR7,8 every X ms
+SetConfig(_CHB,     DATA_SEND_RATE) ' Send heartbeat every X ms
+
+'''''''''''''''''''''''''''''''
+' INITIALIZE GLOBAL VARIABLES '
+'''''''''''''''''''''''''''''''
+
+STEER_PID_P = 3
+STEER_PID_I = 0
+STEER_PID_D = 15
+STEER_KALMAN_GAIN = 256
+
+' Coefficients for conversion equation from potentiometer voltage to tenth-microdegrees
+' In all cases, for POT_TO_DEG_C, + is CCW viewed from top
+' 10,000,000 = 1 degree
+motor_id = getconfig(_CNOD)
+If motor_id = 1 Then ' Front-left ' REV
+	IS_RIGHT = -1
+	IS_FRONT = 1
+	POT_TO_DEG_A = 18 ' Worm gear version
+	POT_TO_DEG_B = -548481
+	POT_TO_DEG_C = 1134957054 ' Is a bit off, pointing inward, but that's fine
+ElseIf motor_id = 2 Then ' Front-right
+	IS_RIGHT = 1
+	IS_FRONT = 1
+	POT_TO_DEG_A = 13 ' Worm gear version
+	POT_TO_DEG_B = -529119
+	POT_TO_DEG_C = 1226034304 + 15000000 - 22000000
+ElseIf motor_id = 4 Then ' Back-right
+	IS_RIGHT = 1
+	IS_FRONT = -1
+	POT_TO_DEG_A = 15 ' Worm gear version
+	POT_TO_DEG_B = -479163
+	POT_TO_DEG_C = 984317265 - 75000000 + 20000000
+ElseIf motor_id = 3 Then ' Back-left
+	IS_RIGHT = -1
+	IS_FRONT = -1
+	POT_TO_DEG_A = 22 ' Worm gear version
+	POT_TO_DEG_B = -555083
+	POT_TO_DEG_C = 1473536801 + 20000000 + 7500000
+End If
+
+Current_Drive_Speed = 0
+Target_Steer_Feedback = 0
+Steer_Feedback_Avg_Length = 5
+Steering_Is_Locked = 0 
+Max_Command_At_Stall = 0 ' Workaround for closed-loop control bug
+' Looks like this is a global variable that I use to maintain a
+' value between loops to counteract a glitch where my notes say that
+' the motor gets stuck on full if it ever applies maximum voltage(?)
+
+
+DRIVE_SPEED_DIVISOR = getconfig(_MXRPM, DRIVE_CHANNEL) / 60 * IS_RIGHT
+' The "max RPM" setting in the configuration is calibrated to be "max speed in m/sec*60"
+' IS_RIGHT is a factor to reverse the drive direction on the left-hand motors, both drive and steering
+' Note that the rear steering motors are revesed again; that reversal is al=pplied when setting motor values
+
+' Initialization of steering position
+gosub MeasureAbsAngle
+Current_Steering_Angle = Measure_Angle
+' This pauses for 1 second if wheel is in range +/-65deg, otherwise gives poor results
+GoSub InitializeSteering
+
+' Wait for confirmation that CAN bus is running
+GoSub SafeUntilSignal
+
+'''''''''''''
+' MAIN LOOP '
+'''''''''''''
+
+' The following get/set commands are from some RoboTeq example code
+top:
+	' Check for new PID, wheel init, etc.:
+	If getvalue(_VAR, NEW_AUX) <> 0 Then
+		GoSub UpdateAuxValues
+	End If
+	
+	' Check for master heartbeat
+	If getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 1 Then
+		SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+		SetCommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+	ElseIf GetTimerState(WATCHDOG_TIMER) = 1 Then
+		GoSub SafeUntilSignal
+	End If
+
+	' Set report variables
+	If GetTimerState(REPORT_TIMER) = 1 Then
+		GoSub ReportParameters
+		SetTimerCount(REPORT_TIMER, DATA_SEND_RATE)
+	End If
+	
+	'''''''''''''''''''''''''''
+	' Handle driving commands '
+	'''''''''''''''''''''''''''
+	
+	' Read command RPDO
+	
+	' Commanded value is -1000 to +1000*, covering the range from -_MXRPM to +_MXRPM
+	' (* Can exceed 1000, but above ~3280 commanded speed, the drive direction reverses)
+	' _MXRPM is in units of m/min, so scaled speed of +1.0 = _MXRPM/60 mm/s
+	' So...
+	' MXRPM=60: input 1000 -> output 1000
+	' MXRPM=120: input 1000 -> output 500
+	' Therefore, output = input / (_MXRPM/60)
+	' DRIVE_SPEED_DIVISOR is combination of _MXRPM/60 and IS_RIGHT
+	
+	' commanded_speed = getvalue(_VAR, COMMANDED_SPEED_VAR) ' in mm/s, should cap at ~4200
+	commanded_speed_scaled = getvalue(_VAR, COMMANDED_SPEED_VAR) / DRIVE_SPEED_DIVISOR ' from mm/s to scaled value
+	
+	' Above ~3280 commanded speed, the drive direction reverses
+	' Steering compensation can push this higher than initial command,
+	' but capping at 2000 should give it plenty of space to work with
+	If commanded_speed_scaled > 1500 Then
+		commanded_speed_scaled = 1500
+	ElseIf commanded_speed_scaled < -1500 Then
+		commanded_speed_scaled = -1500
+	End If
+	
+	' TODO: Bump command/reply up to 0.01deg increments?
+	commanded_angle = getvalue(_VAR, COMMANDED_ANGLE_VAR) ' in tenthdegrees (range -900, +900)
+
+	' Wheel range is +/-90 degrees, or 90,000,000 microdegrees
+	Target_Steering_Angle = commanded_angle * 100000     ' from tenthdegrees to microdegrees
+	If Target_Steering_Angle > 90000000 Then
+		Target_Steering_Angle = 90000000
+	ElseIf Target_Steering_Angle < -90000000 Then
+		Target_Steering_Angle = -90000000
+	End If
+	
+	' Now that we have the commands loaded, do the actual drive calculations
+	GoSub UpdateCurrentAngle
+	GoSub SetMotorPowers
+	
+	
+	wait(10)
+GoTo top
+
+
+' Update estimated steering position, using Kalman filter on abs potentiometer
+' Use properly-scaled analog input from potentiometer, with Kalman filter
+' INPUTS: 
+' - Current_Steering_Angle: Estimated wheel position (microdegrees)
+'
+' OUTPUTS:
+' - Current_Steering_Angle: Estimated wheel position (microdegrees)
+UpdateCurrentAngle:
+	' Update prediction
+	' FIXME: Clean up this equation once verified
+	Steering_Delta = GetValue(_CR, 2) * 9000 / 20 ' microdegrees, plus adjustment for new gearbox
+	Current_Steering_Angle = Current_Steering_Angle + Steering_Delta
+	gosub MeasureAbsAngle ' Measure angle in microdegrees, store in "Measure_Angle"
+	
+	' Only use measured angles in the high-quality range of +-65deg
+	If abs(Measure_Angle) < 65000000 Then
+		' Update average
+		Current_Steering_Angle = Current_Steering_Angle - Current_Steering_Angle/STEER_KALMAN_GAIN
+		Current_Steering_Angle = Current_Steering_Angle + Measure_Angle/STEER_KALMAN_GAIN
+	End If
+	' DEBUG
+	' print("Angle: ",Current_Steering_Angle/100000,"/10 deg (",Current_Steering_Angle," microdeg)\n")
+Return
+
+UpdateCurrentAngleUncalibrated:
+	Current_Steering_Angle = GetValue(_ABCNTR, STEER_CHANNEL) * 9000 / 20 ' microdegrees, plus adjustment for new gearbox
+Return
+
+' Get single noisy measurement of absolute angle
+'
+' INPUTS: None
+'
+' OUTPUTS:
+' - Measure_Angle: Measured wheel position (microdegrees)
+MeasureAbsAngle:
+	voltage = GetValue(_AI, 5)
+	Measure_Angle = (POT_TO_DEG_A*voltage*voltage + POT_TO_DEG_B*voltage + POT_TO_DEG_C) / 10
+Return
+
+InitializeSteering:
+	print("Getting wheel positions...\n")
+	if abs(Current_Steering_Angle) < 65 Then ' Can get reasonably accurate results
+		steer_init_var = 100
+	else
+		steer_init_var = 0 ' else stick with current value, but results will be poor
+	end if
+	While steer_init_var > 0
+		GoSub UpdateCurrentAngle
+		steer_init_var = steer_init_var - 1
+		wait(10)
+	End While
+	' Set counter to +/-10000 depending on which side this is
+	' Limit is +/-200,000, corresonding to +/-90 deg
+	steer_init_var = Current_Steering_Angle / 9 * 20 / 1000
+	setcommand(_SENCNTR, STEER_CHANNEL, steer_init_var)
+Return
+
+
+' Set motor power and brake activation for both steering and drive motors
+' INPUTS:
+' - Target_Steering_Angle (microdegrees)
+' - Current_Steering_Angle (microdegrees)
+' - commanded_speed_scaled (-1,000 to +1,000 ish)
+' 
+' OUTPUTS:
+' Steering_Dead_Zone: The current range around the target angle within which to lock the brakes
+' Steering_Is_Locked: Whether the steering brakes are locked
+' Final_Drive_Speed: Commanded value (-2000 to +2000 ish)
+' Target_Steering_Power: Commanded value (-1000 to +1000)
+SetMotorPowers:
+	
+	Current_Steering_Power = GetValue(_MOTPWR, STEER_CHANNEL) ' In decipercent, -1k to +1k
+	
+	
+	' Change the size of the steering target based on whether the brakes are active
+	' If actively steering, use a smaller target than if steering is locked
+	' This should help keep the wheels from randomly unlocking while driving straight
+	Steering_Dead_Zone = 0
+	If Steering_Is_Locked = 0 Then ' steering motor should be moving, use smaller deadzone
+		Steering_Dead_Zone = Steering_Move_Dead_Zone
+	Else
+		Steering_Dead_Zone = Steering_Brake_Dead_Zone
+	End If
+	
+	If abs(Target_Steering_Angle - Current_Steering_Angle) < Steering_Dead_Zone Then 
+		SetCommand(_GO, STEER_CHANNEL, 0) ' Stop the motor
+		' SetCommand(_MSTOP, STEER_CHANNEL) ' Possible alternate stop method
+		SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+		Steering_Is_Locked = 1
+		Final_Drive_Speed = commanded_speed_scaled ' No drive compensation
+	Else 
+		SetCommand(BRAKES_OFF, STEER_BRAKE_PIN)
+		Steering_Is_Locked = 0
+		
+		' Custom "PIDish" loop. Starting with just P_D loop
+		' P term, with a minimum power of about that for 18 degrees position error
+		' TODO Why did I have two sets of code putting steer power floors in?
+		diff = (Target_Steering_Angle - Current_Steering_Angle) ' in microdegrees
+'		if diff < 2000000 and diff > 0 Then
+'			diff = 2000000
+'		end if
+'		if diff > -2000000 and diff < 0 Then
+'			diff = -2000000
+'		end if
+		
+		' D term
+		' ABSPEED for steering channel is in cm/s at tread contact point
+		' FIXME: Does changing Ch2 max speed change this?
+		' Steer arm length = 305 mm
+		' Ticks per rotation (motor) = 500 CPR
+		' Total gear reduction = 20 * 20 = 400:1
+		' Ticks per 180 deg sweep = 500 * 400 / 2 = 100,000 ticks
+		' mm per 180 deg sweep = steerlen * 2 * pi / 2 = 958 mm
+		' Ticks per m = 100,000 / 958 = 104 ticks/mm, or 104,364 ticks/meter
+		' UNder v1.8 firmware code, I had ticks/rev set to 640
+		' Max value is 32,000, so should use cm/s for steering rate
+		' print(GetValue(_ABSPEED, STEER_CHANNEL),"\n")
+		' FIXME: ...If this is mm/s, WHY AM I GETTING VALUES OF ~15,000?!
+		STEER_PID_P = 57000
+		STEER_PID_D = 50
+		d_term = GetValue(_ABSPEED, STEER_CHANNEL) / STEER_PID_D
+		p_term = diff / STEER_PID_P
+		Target_Steering_Power = (p_term + d_term)
+		
+		' print(Target_Steering_Angle/1000, " - ", Current_Steering_Angle/1000, " =diff= ", diff/1000, "/P + ", GetValue(_ABSPEED, STEER_CHANNEL) , "/D = ", p_term,  " + ", d_term, " = ", Target_Steering_Power, "\n")
+	
+		
+		' Steering command is in cm/s at tread contact, but the full range is larger than the motor supports
+		' TODO: Check this math
+		' Cap it at +/-350 (the true limit), otherwise it gets wonky
+		If Target_Steering_Power > 350 Then
+			Target_Steering_Power = 350
+		ElseIf Target_Steering_Power < -350 Then
+			Target_Steering_Power = -350
+		End If
+		
+		
+		' Set drive power adjustment to match steering power
+		' BEFORE putting the floor function into the steering power
+		steer_adj = Target_Steering_Power / DRIVE_SPEED_DIVISOR * IS_RIGHT
+		
+		' Put a floor on the steering power(speed?), otherwise it can't turn
+		' when it gets close to correct position. 
+		if abs(Target_Steering_Power) < Minimum_Steering_Power Then
+			If Target_Steering_Power < 0 Then 
+				Target_Steering_Power = -Minimum_Steering_Power
+			ElseIf Target_Steering_Power > 0 Then 
+				Target_Steering_Power = Minimum_Steering_Power
+			' Else adjustment is 0, so do nothing
+			End If
+		End If
+		' print("Actual steering command: ",Target_Steering_Power*3,"\n")
+		SetCommand(_GO, STEER_CHANNEL, Target_Steering_Power*3)' Was calibrated for mm/s, but max speed is 350 mm/s
+		' Closed loop speed is doing awful things, so I'm switching to open loop.  350*3 is close enough to 1000
+		' I'm hoping that just dumping in a fixed amount of power is suitable, given the amount of reduction we're using
+		
+		
+		' print(steer_adj,"\n")
+
+		Final_Drive_Speed = commanded_speed_scaled + steer_adj
+	End If
+	
+	print("Drive Target: ",Final_Drive_Speed,"\n")
+	
+	' Drive or stop, as needed
+	If abs(Final_Drive_Speed) > 20 Then
+		SetCommand(BRAKES_OFF, DRIVE_BRAKE_PIN)
+		SetCommand(_GO, DRIVE_CHANNEL, Final_Drive_Speed)
+	Else
+		SetCommand(_GO, DRIVE_CHANNEL, 0)
+		' Brake if slow
+		If abs(GetValue(_ABSPEED, DRIVE_CHANNEL)) < 5 Then
+			SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+			SetCommand(_MSTOP, DRIVE_CHANNEL)
+		End If
+	End If
+	
+' FIXME: Does removing this break anything? now that I'm on firmware 2.1.
+'		If abs(getValue(_MOTPWR, DRIVE_CHANNEL)) >= 500 Then ' Fault: Closed loop failed to close
+' This is a bug in closed-loop mode where if _MOTPWR 1000 is not sufficient 
+' to reach the target speed, the motor gets stuck at _MOTPWR 1000 until power is cut.
+' Weirdly, the loop error remains 0 when this happens, so the normal stall detection fails.
+' So far, ESTOP is the most reliable thing I have found that can be triggered in a script that 
+' clears this fault condition (the other "stops" are completely ignored, and I don't entirely 
+' trust the mode-switching hack I use while in motion).
+'			SetCommand(_EX, 0)
+'			wait(5)
+'			' FIXME: verify that system is not already estopped
+'			' *Should* be implicit in _MOTPWR > 500, but maybe not guaranteed
+'			SetCommand(_MGO, 0)
+'		End If
+'		Min_Command_At_Stall = 10000
+	
+' FIXME: This is an ugly, ugly hack, and hopefully will be fixed with a firmware update
+' FIXME: Does removing this break anything?
+'	' If _MOTPWR ever hits 1000, it gets locked.
+'	' MOTPWR is *NOT* the same as _GO, though- it seems to be "applied voltage"
+'	' This block watches until the commanded speed is <80% of the speed commanded when the motor
+'	' maxed out its power draw. At that point, if the motor is still maxed out, cut the power
+'	' for 30 [TODO: time units], which seems to knock some sense into the controller.
+'	If abs(getValue(_MOTPWR, DRIVE_CHANNEL)) >= 1000 Then
+'		abs_command = abs(Final_Drive_Speed)
+'		If Max_Command_At_Stall = 0 Then
+'			Max_Command_At_Stall = abs(Final_Drive_Speed)
+'		ElseIf abs_command < (Max_Command_At_Stall*4/5) Then
+'			' print("RESET: ", Final_Drive_Speed, " ", getValue(_MOTPWR, DRIVE_CHANNEL), "\n")
+'			' Flicker the power to reset the control loop
+'			' _GO 0 and _MSTOP both fail, but the following seems to work
+'			' Switching control mode to open-loop doesn't clear the closed loop status,
+'			' so the fault returns when you switch back, but if you force the power low enough,
+'			' it seems to knock some sense back into the closed control loop.  For some reason.
+'			SetConfig(_MMOD, DRIVE_CHANNEL, 0)
+'			SetCommand(_GO, DRIVE_CHANNEL, getValue(_MOTPWR, DRIVE_CHANNEL)/15)
+'			wait(30)
+'			SetConfig(_MMOD, DRIVE_CHANNEL, 1)
+'			SetCommand(_GO, DRIVE_CHANNEL, Final_Drive_Speed)
+'			Max_Command_At_Stall = 0
+'		End If
+'	End If
+	' TODO: If you watch the "Run" tab, it looks like the motor command glitches low a couple of times per second at all speeds.
+	' Is this real?
+	' print("D: ", commanded_speed_scaled, " ", Final_Drive_Speed, " ", getValue(_MOTPWR, DRIVE_CHANNEL), "\n")
+	' print("D: ", commanded_speed_scaled, "->", Final_Drive_Speed, "->", GetValue(_MOTPWR, DRIVE_CHANNEL) , " S: ",Target_Steering_Angle,"->",Target_Steering_Power," : ", GetValue(_MOTPWR, STEER_CHANNEL), " : ",Current_Steering_Angle," ",GetValue(_LPERR, STEER_CHANNEL),"\n")
+Return
+
+
+' Subroutine to update values passed in from the master
+UpdateAuxValues:
+	update_mode = getvalue(_VAR, NEW_AUX)
+	If update_mode = AUX_OPTION_DRIVE_PID Then
+		' TODO: Remove these prints?
+		print("NEW DRIVE PID ", getvalue(_VAR, AUX1_VAR), " ", getvalue(_VAR, AUX2_VAR), " ", getvalue(_VAR, AUX3_VAR),"\n")
+		print("EXISTING ", getconfig(_KP, DRIVE_CHANNEL), " ", getconfig(_KI, DRIVE_CHANNEL), " ", getconfig(_KD, DRIVE_CHANNEL),"\n")
+		setconfig(_KP, DRIVE_CHANNEL, getvalue(_VAR, AUX1_VAR))
+		setconfig(_KI, DRIVE_CHANNEL, getvalue(_VAR, AUX2_VAR))
+		setconfig(_KD, DRIVE_CHANNEL, getvalue(_VAR, AUX3_VAR))
+		print("UPDATED DRIVE PID ", getconfig(_KP, DRIVE_CHANNEL), " ", getconfig(_KI, DRIVE_CHANNEL), " ", getconfig(_KD, DRIVE_CHANNEL),"\n")
+	ElseIf update_mode = AUX_OPTION_STEER_PID Then
+		print("NEW STEER PID ", getvalue(_VAR, AUX1_VAR), " ", getvalue(_VAR, AUX2_VAR), " ", getvalue(_VAR, AUX3_VAR),"\n")
+		print("EXISTING ", getconfig(_KP, STEER_CHANNEL), " ", getconfig(_KI, STEER_CHANNEL), " ", getconfig(_KD, STEER_CHANNEL),"\n")
+		setconfig(_KP, STEER_CHANNEL, getvalue(_VAR, AUX1_VAR))
+		setconfig(_KI, STEER_CHANNEL, getvalue(_VAR, AUX2_VAR))
+		setconfig(_KD, STEER_CHANNEL, getvalue(_VAR, AUX3_VAR))
+		print("UPDATED STEER PID ", getconfig(_KP, STEER_CHANNEL), " ", getconfig(_KI, STEER_CHANNEL), " ", getconfig(_KD, STEER_CHANNEL),"\n")
+	ElseIf update_mode = AUX_OPTION_STEER_MANUAL_PID Then
+		print("NEW MANUAL STEER PID ", getvalue(_VAR, AUX1_VAR), " ", getvalue(_VAR, AUX2_VAR), " ", getvalue(_VAR, AUX3_VAR),"\n")
+		print("EXISTING ", STEER_PID_P, " ", STEER_PID_I, " ", STEER_PID_D,"\n")
+		STEER_PID_P = getvalue(_VAR, AUX1_VAR)
+		STEER_PID_I = getvalue(_VAR, AUX2_VAR)
+		STEER_PID_D = getvalue(_VAR, AUX3_VAR)
+		print("UPDATED ", STEER_PID_P, " ", STEER_PID_I, " ", STEER_PID_D,"\n")
+	ElseIf update_mode = AUX_OPTION_CAL_STEER Then
+		GoSub InitializeSteering
+'	ElseIF update_mode = AUX_OPTION_RESTART_SCRIPT
+'		setcommand(_BRUN, 2) ' Restart script
+	End If
+	SetCommand(_VAR, NEW_AUX, 0)
+Return
+
+
+
+' Motor Debug Param Reporting
+ReportParameterDEBUG:
+	setcommand(_VAR, 1,  getvalue(_FF, 1)*256*256*256 + getvalue(_FS, 1)*256*256  + getvalue(_MOTCMD, 2)   ) ' motor 1 mm/s
+	setcommand(_VAR, 2,  Final_Drive_Speed                 ) ' in 1/10 amps
+	setcommand(_VAR, 3,  GetValue(_MOTPWR, DRIVE_CHANNEL)  ) ' drive motor incremental step count (TODO: Convert to a physical unit?)
+	setcommand(_VAR, 4,  Target_Steering_Angle )                ' MCU Temp (TODO: UNITS?)
+	
+	setcommand(_VAR, 5,  Current_Steering_Angle/100000)    ' DO NOT EDIT Steer motor angle in 1/10 degrees
+	
+	setcommand(_VAR, 6,  Target_Steering_Power            ) ' in 1/10 amps ' Could totally combine the amps as 16-bit ints
+	setcommand(_VAR, 7,  GetValue(_MOTPWR, STEER_CHANNEL) )   ' in 1/10 degree C ' Could probably combine these temps as 16-bit unsigned ints
+	setcommand(_VAR, 8,  Current_Steering_Angle        )   ' in 1/10 degree C
+	' result = getvalue(_FF, 1) ' Fault flags for controller, 8-bit value
+	' Could also add motor channel flags and status flags for a 32-bit combo
+	' MOTPWR is also insteresting- actual PWM level applied to channel
+' GetValue(_M, STEER_CHANNEL)
+Return
+
+
+' Parameter-reporting subroutine
+ReportParameters:
+	setcommand(_VAR, 1,  getValue(_ABSPEED, DRIVE_CHANNEL)*100/6 ) ' motor 1 mm/s
+	setcommand(_VAR, 2,  abs(getValue(_MOTAMPS, STEER_CHANNEL))*256*256 + abs(getValue(_MOTAMPS, DRIVE_CHANNEL)) ) ' in 1/10 amps
+	setcommand(_VAR, 3,  getValue(_RELCNTR, DRIVE_CHANNEL) ) ' drive motor incremental step count (TODO: Convert to a physical unit?)
+	setcommand(_VAR, 4,  getValue(_TEMP, 1) )                ' MCU Temp (TODO: UNITS?) (TWO BYTES(?) UNUSED)
+	setcommand(_VAR, 5,  Current_Steering_Angle/100000)    ' Steer motor angle in 1/10 degrees (TWO BYTES UNUSED!)
+	setcommand(_VAR, 6,  (getValue(_MOTPWR, STEER_CHANNEL)+1000)*256*256 + (getValue(_MOTPWR, DRIVE_CHANNEL)+1000) ) ' Applied PWM value, range -1000 to +1000
+	setcommand(_VAR, 7,  getValue(_AI, STEER_TEMP_INPUT)*256*256 + getValue(_AI, DRIVE_TEMP_INPUT) )   ' in 1/10 degree C 
+	setcommand(_VAR, 8,  getvalue(_FF, 1)*256*256*256 + getvalue(_FS, 1)*256*256 + Steering_Is_Locked )   ' Status flags, plus internal status
+	' result = getvalue(_FF, 1) ' Fault flags for controller, 8-bit value
+	' Could also add motor channel flags and status flags for a 32-bit combo
+Return
+
+
+
+' Wait for Master to (re)establish communication
+' Stops and locks the motors, and does nothing but maintain the Kalman loop for steering position
+SafeUntilSignal:
+	print("Lost Master!\n")
+	' Clear the flag that set by the NUC's "heartbeat" RPDO
+	setcommand(_VAR, MASTER_IS_ALIVE_VAR, 0)
+	
+	' Stop motors
+	setcommand(_MSTOP, DRIVE_CHANNEL) ' "Stop in all modes" - untrustworthy for closed loop relative mode
+	setcommand(_MSTOP, STEER_CHANNEL)
+	
+	' Wait until both are stopped before signaling brakes
+	' FIXME: Loops like these block forever
+	'While GetConfig(_S, STEER_CHANNEL) <> 0 ' Steering speed
+	wait(10)
+	SetCommand(BRAKES_ON, STEER_BRAKE_PIN)
+	SetCommand(BRAKES_ON, DRIVE_BRAKE_PIN)
+	
+	' Wait for a signal
+	print("Waiting...\n")
+	While getvalue(_VAR, MASTER_IS_ALIVE_VAR) = 0
+		GoSub UpdateCurrentAngle
+		wait(10)
+	End While
+	print("Found Master!\n")
+	
+	SetTimerCount(WATCHDOG_TIMER, WATCHDOG_TIMEOUT)
+Return
+
