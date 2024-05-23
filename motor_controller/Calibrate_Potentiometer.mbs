@@ -1,0 +1,103 @@
+' Code for getting calibration values for the steering potentiometer.
+' With this code running, use the manual control features in RoboRun+ to move the steering motor around (unlock the drive motor hub first)
+' and look at the console tab to see what the reported potentiometer voltage is.
+' The reported "true angle" is based on the motor encoder and will be biased by wheel backlash.
+
+' I think there's also a test version of the Kalman filter if you update 
+' the POT_TO_DEG valiables in teh second half of the code and uncomment this goto:
+' goto start_kalman
+
+
+voltage = 207000
+
+get_volt_stats:
+	
+	angle_true = GetValue(_C, 2) * 9 / 10 / 20' from +/- 10000 to centidegrees
+	
+	' Quick Kalman adjustment to reduce settle time
+	rough_voltage_change = GetValue(_CR, 2) * 100 / -400
+	voltage = voltage + rough_voltage_change
+	
+	' Running average
+	voltage  = voltage - voltage/(100/5)
+	new_voltage = GetValue(_AI, 5)
+	voltage  = voltage + new_voltage*5
+	
+	print("Angle ",angle_true," ; volt ", new_voltage, " ; mean volt ", voltage/100)
+	if abs(angle_true) > 6500 then
+		print(" OUT OF RANGE\n")
+	else
+		print("\n")
+	end if
+	wait(50)
+goto get_volt_stats
+
+
+''''''''''''''''''''''''''''''''''''''''''
+
+
+start_kalman:
+	' Coefficients for conversion equation from potentiometer voltage to microdegrees
+	motor_id = getconfig(_CNOD)
+	If motor_id = 1 Then ' Front-left
+		POT_TO_DEG_A = 4
+		POT_TO_DEG_B = -458164
+		POT_TO_DEG_C = 1058650861
+		
+		POT_TO_DEG_A = 16 ' Worm gear version
+		POT_TO_DEG_B = -515202
+		POT_TO_DEG_C = 1078127891
+
+	ElseIf motor_id = 2 Then ' Front-right
+		POT_TO_DEG_A = 15
+		POT_TO_DEG_B = -499600
+		POT_TO_DEG_C = 1056978890
+		
+		POT_TO_DEG_A = 16 ' Worm gear version
+		POT_TO_DEG_B = -519540
+		POT_TO_DEG_C = 1070747572
+		
+	ElseIf motor_id = 3 Then ' Back-left
+		POT_TO_DEG_A = 1
+		POT_TO_DEG_B = -1
+		POT_TO_DEG_C = 100
+		POT_TO_DEG_A = 12 ' Worm gear version
+		POT_TO_DEG_B = -498300
+		POT_TO_DEG_C = 1161501777
+	ElseIf motor_id = 4 Then ' Back-right
+		POT_TO_DEG_A = 1
+		POT_TO_DEG_B = -1
+		POT_TO_DEG_C = 100
+		POT_TO_DEG_A = 13 ' Worm gear version
+		POT_TO_DEG_B = -495089
+		POT_TO_DEG_C = 1115731335
+	End If
+	print(POT_TO_DEG_A," ",POT_TO_DEG_B," ",POT_TO_DEG_C,"\n")
+
+	gosub measure_abs_angle ' Get measured angle in microdegrees, store in "measure_angle"
+	angle = measure_angle 
+	KALMAN_GAIN = 256
+	
+	kalman:
+		angle_true = GetValue(_C, 2) * 9 / 20 ' Millidegrees
+		
+		' Adjust prediction
+		angle_delta = GetValue(_CR, 2) * 9000 / 20 ' microdegrees
+		angle = angle + angle_delta
+		
+		' Update average
+		angle  = angle - angle/KALMAN_GAIN
+		gosub measure_abs_angle
+		angle  = angle + measure_angle/KALMAN_GAIN
+		
+		print("True ",angle_true," ; mvd ", angle_delta/1000, " ; volt ", voltage, " ; msrd ", measure_angle/1000, " ; kalman ", angle/1000, "\n")
+		
+		wait(50)
+goto kalman
+
+
+measure_abs_angle:
+	voltage = GetValue(_AI, 5)
+	measure_angle = POT_TO_DEG_A*voltage*voltage + POT_TO_DEG_B*voltage + POT_TO_DEG_C
+	measure_angle = measure_angle /10
+Return
